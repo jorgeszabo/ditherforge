@@ -37,6 +37,21 @@ class HybridTests(unittest.TestCase):
         self.patch.stop()
         self.temp.cleanup()
 
+    def test_remote_access_requires_exact_origin_identity_and_device(self):
+        remote = {"origin": "https://mini.example.ts.net:8447", "allowedLogins": ["owner@example.test"], "allowedClientIPs": ["100.64.0.2"]}
+        headers = {"Host": "mini.example.ts.net:8447", "X-Forwarded-Host": "mini.example.ts.net:8447", "X-Forwarded-Proto": "https", "X-Forwarded-For": "100.64.0.2", "Tailscale-User-Login": "owner@example.test"}
+        self.assertEqual(hybrid.request_origin(headers, 8874, "127.0.0.1", remote), remote["origin"])
+        for changed in ({"Tailscale-User-Login": "other@example.test"}, {"X-Forwarded-For": "100.64.0.3"}, {"Host": "127.0.0.1:8874"}, {"Tailscale-Funnel-Request": "?1"}, {"X-Forwarded-For": "100.64.0.2, 100.64.0.3"}):
+            with self.assertRaises(PermissionError):
+                hybrid.request_origin({**headers, **changed}, 8874, "127.0.0.1", remote)
+        with self.assertRaises(PermissionError):
+            hybrid.request_origin(headers, 8874, "100.64.0.2", remote)
+
+    def test_remote_access_is_disabled_without_explicit_config(self):
+        self.assertEqual(hybrid.request_origin({"Host": "127.0.0.1:8874"}, 8874, "127.0.0.1", {}), "http://127.0.0.1:8874")
+        with self.assertRaises(PermissionError):
+            hybrid.request_origin({"Host": "remote.example"}, 8874, "127.0.0.1", {})
+
     def test_shared_settings_update_and_conflict_detection(self):
         before = indx.sha(self.settings)
         result = indx.configure(self.settings, {"brightness": 15}, before)

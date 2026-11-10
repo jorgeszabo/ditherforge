@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { ArrowDownToLineIcon, ArrowRightIcon, CheckIcon, ChevronDownIcon, CircleCheckIcon, Clock3Icon, FileBoxIcon, FolderOpenIcon, Layers3Icon, Link2Icon, LockKeyholeIcon, PipetteIcon, PlusIcon, RefreshCwIcon, RotateCcwIcon, SaveIcon, SlidersHorizontalIcon, SparklesIcon, XIcon } from '@lucide/svelte';
   import ModelViewer from './lib/components/ModelViewer.svelte';
   import { SharedCamera } from './lib/components/SharedCamera.svelte';
 
@@ -24,6 +25,7 @@
   let job = $state<Job | null>(null);
   let pending = $state(false);
   let projectName = $state('');
+  let view = $state<'compare' | 'source' | 'result'>('compare');
   let uploading = $state(false);
   let pickMode = $state(false);
   let sampledColor = $state('#808080');
@@ -70,6 +72,8 @@
       await loadProject(name);
     } catch (e) { error = String(e); }
   }
+
+  function pickSource() { view = 'compare'; pickMode = !pickMode; }
 
   function resetView() { camera = new SharedCamera(); viewEpoch += 1; }
 
@@ -145,64 +149,58 @@
 
 <div class="studio">
   <header class="studio-header">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">▦</span><div><strong>INDX <span>Colour Studio</span></strong><small>DitherForge · browser + chat</small></div></div>
-    <div class="header-right"><span class="local-badge"><i></i> Local on your Mac</span><span class="machine">CORE One · 8 × 0.4 HF</span></div>
+    <a class="brand" href="/" aria-label="INDX Colour Studio home"><span class="brand-mark" aria-hidden="true">{#each Array(9) as _, i}<i class:mark-light={i === 2 || i === 6} class:mark-blue={i === 5}></i>{/each}</span><span><strong>INDX<span class="brand-divider">/</span>Colour Studio</strong><small>By DitherForge</small></span></a>
+    <div class="header-right"><span class="machine"><span class="machine-dot"></span> CORE One INDX <b>8T</b></span><span class="local-badge"><LockKeyholeIcon size={12}/> Private workspace</span></div>
   </header>
-
   <div class="studio-layout">
     <aside class="studio-sidebar" aria-label="Project controls">
-      <section class="control-section">
-        <h2>Workspace</h2>
-        <label for="project">Project</label>
-        <div class="project-select"><select id="project" value={selected} disabled={busy} onchange={async e => { const select = e.currentTarget; await switchProject(select.value); select.value = selected; }}><option value="" disabled>Choose a project</option>{#each projects as name}<option>{name}</option>{/each}</select><button class="icon-button" aria-label="Reload project from disk" disabled={!project || busy} onclick={() => loadProject(selected)}>↻</button></div>
-        <details class="import-panel"><summary>＋ Import a model</summary><label for="new-project">New project name</label><input id="new-project" bind:value={projectName} placeholder="Use model filename" disabled={busy}/><label class:disabled={busy} class="file-button" for="model-file">{uploading ? 'Copying model…' : 'Choose model file'}</label><input id="model-file" class="visually-hidden" type="file" accept=".glb,.3mf,.stl,.obj,.dae,.zip" disabled={busy} onchange={importModel}/><p>GLB, 3MF, STL, OBJ or model ZIP. Saved in your 3D print folder.</p></details>
-      </section>
-
-      <section class="control-section">
-        <div class="section-heading"><h2>Tool colours</h2><span>{activeTools} / 8 selected</span></div>
-        <p class="help-text">Choose the spools you intend to load.</p>
-        <div class="tool-list">
-          {#each tools as tool (tool.tool)}
-            <div class:tool-inactive={tool.role !== 'color'} class="tool-row">
-              <label class="tool-check" title={tool.type === 'PETG' ? 'PETG stays out of the PLA colour mix' : 'Include in colour palette'}><input type="checkbox" aria-label={`Use tool ${tool.tool} for colour`} checked={tool.role === 'color'} disabled={busy || tool.type === 'PETG'} onchange={() => toggleTool(tool)}/><span>T{tool.tool}</span></label>
+      <div class="sidebar-scroll">
+        <section class="control-section project-section">
+          <div class="section-heading"><h2><FolderOpenIcon size={15}/> Project</h2><span class="save-state" class:unsaved={dirty}>{dirty ? 'Unsaved edits' : 'Saved'}</span></div>
+          <div class="project-select"><select aria-label="Project" id="project" value={selected} disabled={busy} onchange={async e => { const select = e.currentTarget; await switchProject(select.value); select.value = selected; }}><option value="" disabled>Choose a project</option>{#each projects as name}<option>{name}</option>{/each}</select><button class="icon-button" aria-label="Reload project from disk" title="Reload saved settings" disabled={!project || busy} onclick={() => loadProject(selected)}><RefreshCwIcon size={15}/></button></div>
+          <details class="import-panel"><summary><PlusIcon size={14}/> Import a model</summary><label for="new-project">Project name</label><input id="new-project" bind:value={projectName} placeholder="Use model filename" disabled={busy}/><label class:disabled={busy} class="file-button" for="model-file"><FileBoxIcon size={22}/><strong>{uploading ? 'Copying model…' : 'Choose your model'}</strong><span>GLB · 3MF · STL · OBJ · DAE · ZIP</span></label><input id="model-file" class="visually-hidden" type="file" accept=".glb,.3mf,.stl,.obj,.dae,.zip" disabled={busy} onchange={importModel}/><p>Originals stay in your 3D print folder.</p></details>
+        </section>
+        <section class="control-section tool-section">
+          <div class="section-heading"><h2><Layers3Icon size={15}/> Your filaments</h2><span>{activeTools} of 8</span></div><p class="help-text">Your palette. Your physical tool numbers.</p>
+          <div class="tool-list">{#each tools as tool (tool.tool)}
+            <div class:tool-inactive={tool.role !== 'color'} class:tool-support={tool.type === 'PETG'} class="tool-row">
+              <label class="tool-check" title={tool.type === 'PETG' ? 'PETG reserved for supports' : 'Include in colour palette'}><input type="checkbox" aria-label={`Use tool ${tool.tool} for colour`} checked={tool.role === 'color'} disabled={busy || tool.type === 'PETG'} onchange={() => toggleTool(tool)}/><span>T{tool.tool}</span></label>
               <input type="color" aria-label={`Tool ${tool.tool} colour`} value={tool.color || '#808080'} disabled={busy || tool.role !== 'color'} oninput={e => { tool.color = e.currentTarget.value; dirty = true; }}/>
-              <div class="spool-fields"><input class="spool-name" aria-label={`Tool ${tool.tool} spool name`} value={tool.label || ''} placeholder="Assign a spool" disabled={busy} oninput={e => { tool.label = e.currentTarget.value; dirty = true; }}/><select aria-label={`Tool ${tool.tool} material`} value={tool.type || ''} disabled={busy} onchange={e => { tool.type = e.currentTarget.value; if (tool.type === 'PETG') tool.role = 'support'; dirty = true; }}><option value="">Unassigned</option><option>PLA</option><option>PETG</option></select>{#if tool.type === 'PETG'}<span class="reserved">Reserved</span>{/if}</div>
+              <div class="spool-fields"><input class="spool-name" aria-label={`Tool ${tool.tool} spool name`} title={tool.label || 'Assign a spool'} value={tool.label || ''} placeholder="Assign a spool" disabled={busy} oninput={e => { tool.label = e.currentTarget.value; dirty = true; }}/><div class="spool-meta"><select aria-label={`Tool ${tool.tool} material`} value={tool.type || ''} disabled={busy} onchange={e => { tool.type = e.currentTarget.value; if (tool.type === 'PETG') tool.role = 'support'; dirty = true; }}><option value="">Unassigned</option><option>PLA</option><option>PETG</option></select>{#if tool.type === 'PETG'}<span class="reserved"><LockKeyholeIcon size={9}/> Support</span>{/if}</div></div>
             </div>
-          {/each}
-        </div>
-      </section>
-
-      <section class="control-section" aria-label="Print and colour settings">
-        <h2>Print & colour</h2>
-        <div class="two-fields"><label>Longest side <div class="unit-input"><input aria-label="Longest side in millimetres" type="number" min="1" max="300" bind:value={options.sizeValue} disabled={busy} oninput={() => dirty = true}/><span>mm</span></div></label><label>Layer height<select aria-label="Layer height" bind:value={options.layerHeight} disabled={busy} onchange={() => dirty = true}>{#each layerChoices as h}<option value={h}>{h.toFixed(2)} mm</option>{/each}</select></label></div>
-        <label>Dither pattern<select aria-label="Dither pattern" bind:value={options.dither} disabled={busy} onchange={() => dirty = true}><option value="dlc-d30-p7">Dizzy · balanced</option><option value="riemersma">Riemersma</option><option value="floyd-steinberg">Floyd–Steinberg</option><option value="bn-adapt-5">Blue noise</option><option value="none">Solid colours only</option></select></label>
-        <label class="range-label">Colour cell size <output>{options.upperLayerXYScale.toFixed(2)}×</output><input aria-label="Colour cell size" type="range" min="1" max="4" step="0.05" bind:value={options.upperLayerXYScale} disabled={busy} oninput={() => dirty = true}/></label><p class="help-text">Larger cells trade fine colour detail for fewer small regions.</p>
-        <details><summary>Fine tuning</summary>
-          {#each ['brightness', 'contrast', 'saturation'] as key}<label class="range-label">{key[0].toUpperCase() + key.slice(1)}<output>{options[key as 'brightness' | 'contrast' | 'saturation']}</output><input aria-label={key} type="range" min="-100" max="100" value={options[key as 'brightness' | 'contrast' | 'saturation']} disabled={busy} oninput={e => { options[key as 'brightness' | 'contrast' | 'saturation'] = Number(e.currentTarget.value); dirty = true; }}/></label>{/each}
-          <label class="range-label">Reduce near-solid speckle<output>{options.colorSnap}</output><input aria-label="Reduce near-solid speckle" type="range" min="0" max="50" bind:value={options.colorSnap} disabled={busy} oninput={() => dirty = true}/></label>
-          <label>Mesh repair<select aria-label="Mesh repair" bind:value={options.meshRepair} disabled={busy} onchange={() => dirty = true}><option value="none">Use original geometry</option><option value="fwn">Winding-number remesh</option><option value="alphawrap">Alpha wrap</option></select></label>
-        </details>
-      </section>
-      <div class="sidebar-actions"><button class="secondary" disabled={!project || !dirty || busy} onclick={saveOnly}>Save settings</button><button class="primary" disabled={!project || busy} onclick={() => runJob('preview')}>{busy ? 'Working…' : 'Update preview'} <span>↗</span></button></div>
-    </aside>
-
-    <main class="studio-main">
-      <div class="workspace-heading"><div><p class="eyebrow">COLOUR WORKSPACE</p><h1>{project?.name || 'Make your next colour print'}</h1><p>{project ? project.sourceName : 'Import a textured model to start.'}</p></div><button class="secondary" disabled={!project} onclick={resetView}>Reset view</button></div>
-      {#if error}<div class="message error" role="alert">{error}</div>{/if}
-      {#if notice}<div class="message success" role="status">{notice}</div>{/if}
-      {#if busy}<div class="job-status" role="status"><span class="spinner"></span><strong>{job?.kind === 'build' ? 'Validating your print project' : uploading ? 'Importing model' : 'Preparing your preview'}</strong><span>{stage}</span></div>{/if}
-
-      <div class="viewer-grid">
-        <section class="viewer-panel" aria-label="Source model viewer"><div class="viewer-heading"><h2>{options.brightness || options.contrast || options.saturation || pins.length ? 'Adjusted source' : 'Source model'}</h2><span>REFERENCE</span></div><div class="viewer-canvas">{#key viewEpoch}<ModelViewer meshUrl={inputUrl} label="Source model" viewerId="hybrid-input" {camera} brightness={options.brightness} contrast={options.contrast} saturation={options.saturation} warpPins={pins.map(p => ({sourceHex:p.sourceHex,targetHex:p.targetHex,sigma:p.sigma}))} {pickMode} onColorPick={hex => { sampledColor = hex; pickMode = false; }} progressActive={false}/>{/key}{#if !inputUrl}<div class="viewer-empty">{busy ? 'Loading source geometry…' : 'Your model appears here'}</div>{/if}</div><div class="viewer-footer">Drag to rotate · Scroll to zoom · Right-drag to pan</div></section>
-        <section class="viewer-panel" aria-label="Dithered model viewer"><div class="viewer-heading"><h2>Dithered preview</h2><span class:needs-update={previewStale}>{previewStale ? 'NEEDS UPDATE' : 'FILAMENT COLOURS'}</span></div><div class="viewer-canvas">{#key viewEpoch}<ModelViewer meshUrl={outputUrl} label="Dithered model" viewerId="hybrid-output" {camera} progressActive={false}/>{/key}{#if !outputUrl}<div class="viewer-empty">{busy ? 'Building printable colour regions…' : 'Generate a preview to compare'}</div>{/if}</div><div class="viewer-footer">Cameras linked · Appearance is uncalibrated</div></section>
+          {/each}</div><p class="help-text">Project assignments · not live spool inventory</p>
+        </section>
+        <section class="control-section" aria-label="Print and colour settings">
+          <div class="section-heading"><h2><SlidersHorizontalIcon size={15}/> Print & colour</h2><span>0.4 HF</span></div>
+          <div class="two-fields"><label>Longest side<div class="unit-input"><input aria-label="Longest side in millimetres" type="number" min="1" max="300" bind:value={options.sizeValue} disabled={busy} oninput={() => dirty = true}/><span>mm</span></div></label><label>Layer height<select aria-label="Layer height" bind:value={options.layerHeight} disabled={busy} onchange={() => dirty = true}>{#each layerChoices as h}<option value={h}>{h.toFixed(2)} mm</option>{/each}</select></label></div>
+          <label>Dither pattern<select aria-label="Dither pattern" bind:value={options.dither} disabled={busy} onchange={() => dirty = true}><option value="dlc-d30-p7">Dizzy · balanced</option><option value="riemersma">Riemersma</option><option value="floyd-steinberg">Floyd–Steinberg</option><option value="bn-adapt-5">Blue noise</option><option value="none">Solid colours only</option></select></label>
+          <label class="range-label">Colour cell size<output>{options.upperLayerXYScale.toFixed(2)}×</output><input aria-label="Colour cell size" type="range" min="1" max="4" step="0.05" bind:value={options.upperLayerXYScale} disabled={busy} oninput={() => dirty = true}/></label><div class="range-endpoints"><span>More detail</span><span>Larger regions</span></div>
+          <details class="fine-tuning"><summary>Fine tuning<ChevronDownIcon size={14}/></summary>
+            {#each ['brightness', 'contrast', 'saturation'] as key}<label class="range-label">{key[0].toUpperCase() + key.slice(1)}<output>{options[key as 'brightness' | 'contrast' | 'saturation']}</output><input aria-label={key} type="range" min="-100" max="100" value={options[key as 'brightness' | 'contrast' | 'saturation']} disabled={busy} oninput={e => { options[key as 'brightness' | 'contrast' | 'saturation'] = Number(e.currentTarget.value); dirty = true; }}/></label>{/each}
+            <label class="range-label">Reduce near-solid speckle<output>{options.colorSnap}</output><input aria-label="Reduce near-solid speckle" type="range" min="0" max="50" bind:value={options.colorSnap} disabled={busy} oninput={() => dirty = true}/></label>
+            <label>Mesh repair<select aria-label="Mesh repair" bind:value={options.meshRepair} disabled={busy} onchange={() => dirty = true}><option value="none">Use original geometry</option><option value="fwn">Winding-number remesh</option><option value="alphawrap">Alpha wrap</option></select></label>
+          </details>
+        </section>
       </div>
-
-      <section class="correction-panel"><div><h2>Correct a colour</h2><p>Sample the source, choose a target, then update the preview.</p></div><button class:active={pickMode} class="secondary" disabled={!inputUrl || busy} onclick={() => pickMode = !pickMode}>{pickMode ? 'Click the source model…' : '⌖ Pick on model'}</button><input aria-label="Source correction colour" type="color" bind:value={sampledColor}/><span>→</span><input aria-label="Target correction colour" type="color" bind:value={correctionColor}/><button class="secondary" disabled={busy || pins.length >= 8 || !project} onclick={addPin}>Add correction</button>{#if pins.length}<button class="text-button" disabled={busy} onclick={() => { pins = []; dirty = true; }}>Clear {pins.length}</button>{/if}</section>
-
-      <section class="print-panel"><div class="print-top"><div><p class="eyebrow">NATIVE PRUSASLICER PROJECT</p><h2>{project?.printCurrent && !dirty ? 'Validated for these settings' : 'Ready when you are'}</h2><p>Export reopens and slices in alpha13. A previous print is archived after the new revision passes.</p></div><button class="primary export-button" disabled={!project || busy} onclick={() => runJob('build')}>Save print revision <span>↓</span></button></div>
-        {#if project?.validation}<div class="print-metrics"><div><span>{project.printCurrent && !dirty ? 'Estimated print time' : 'Last validated print'}</span><strong>{project.validation.estimatedPrintTime || project.validation.printTime?.[0]?.split(' = ')[1] || 'Available in report'}</strong></div><div><span>Filament</span><strong>{project.validation.filamentGrams?.toFixed(2) || '—'} <small>g</small></strong></div><div><span>Tool changes</span><strong>{project.validation.toolChangeCount ?? '—'}</strong></div><a class="secondary download" href={`/api/download?name=${encodeURIComponent(project.name)}`}>{project.printCurrent && !dirty ? 'Download 3MF' : 'Previous 3MF'} ↗</a></div><details class="diagnostics"><summary>Slice diagnostics · {project.validation.validation.warnings.length} notices</summary><p>Not physically tested. Inspect fine colour regions before printing.</p>{#each project.validation.validation.warnings as warning}<p>{warning}</p>{/each}</details>{:else}<p class="print-note">A preview is not a sliced print. Print estimates appear after validation.</p>{/if}
+      <div class="sidebar-actions"><button class="secondary save-button" disabled={!project || !dirty || busy} onclick={saveOnly}><SaveIcon size={14}/> Save settings</button><button class="primary" disabled={!project || busy} onclick={() => runJob('preview')}><SparklesIcon size={15}/> {busy ? 'Working…' : 'Update preview'}<ArrowRightIcon size={16}/></button></div>
+    </aside>
+    <main class="studio-main">
+      <div class="workspace-heading"><div><p class="eyebrow"><span></span> YOUR COLOUR WORKSPACE</p><h1>{project?.name || 'A little colour. Endless possibilities.'}</h1><p>{project ? project.sourceName : 'Start with a model. Make it your own.'}</p></div><div class="project-status" class:status-stale={dirty || previewStale}><i></i>{!project ? 'Ready to create' : dirty ? 'Unsaved changes' : previewStale ? 'Preview needs an update' : 'All changes saved'}</div></div>
+      {#if error}<div class="message error" role="alert">{error}</div>{/if}
+      {#if notice}<div class="message success" role="status"><CheckIcon size={16}/><span>{notice}</span></div>{/if}
+      {#if busy}<div class="job-status" role="status"><span class="spinner"></span><strong>{job?.kind === 'build' ? 'Validating your print project' : uploading ? 'Importing model' : 'Preparing your preview'}</strong><span>{stage}</span></div>{/if}
+      <div class="preview-toolbar"><div class="view-switch" role="group" aria-label="Preview layout">{#each [{id:'compare', label:'Compare'}, {id:'source', label:'Source'}, {id:'result', label:'Result'}] as mode}<button aria-pressed={view === mode.id} class:chosen={view === mode.id} onclick={() => { view = mode.id as typeof view; pickMode = false; }}>{mode.label}</button>{/each}</div><span class="camera-link"><Link2Icon size={12}/> Linked cameras</span><button class="text-button reset-view" disabled={!project} onclick={resetView}><RotateCcwIcon size={14}/> Reset view</button></div>
+      <div class="viewer-grid" class:single-view={view !== 'compare'}>
+        <section class="viewer-panel" class:viewer-hidden={view === 'result'} aria-label="Source model viewer"><div class="viewer-heading"><h2><span class="viewer-number">01</span>{options.brightness || options.contrast || options.saturation || pins.length ? 'Adjusted source' : 'Source model'}</h2><span class="viewer-tag">ORIGINAL</span></div><div class="viewer-canvas dark">{#key viewEpoch}<ModelViewer meshUrl={inputUrl} label="Source model" showLabel={false} viewerId="hybrid-input" {camera} brightness={options.brightness} contrast={options.contrast} saturation={options.saturation} warpPins={pins.map(p => ({sourceHex:p.sourceHex,targetHex:p.targetHex,sigma:p.sigma}))} {pickMode} onColorPick={hex => { sampledColor = hex; pickMode = false; }} progressActive={false}/>{/key}{#if !inputUrl}<div class="viewer-empty"><FileBoxIcon size={32}/><strong>{busy ? 'Loading your model…' : 'Your next colour print starts here'}</strong><span>Import a model from the project panel.</span></div>{/if}{#if pickMode}<div class="pick-hint"><PipetteIcon size={14}/> Click a colour on the model</div>{/if}</div><div class="viewer-footer"><span>Drag to rotate · Scroll to zoom</span><span>Right-drag to pan</span></div></section>
+        <section class="viewer-panel result-panel" class:viewer-hidden={view === 'source'} aria-label="Dithered model viewer"><div class="viewer-heading"><h2><span class="viewer-number">02</span>Dithered preview</h2><span class="viewer-tag" class:needs-update={previewStale}>{previewStale ? 'NEEDS UPDATE' : 'YOUR FILAMENTS'}</span></div><div class="viewer-canvas dark">{#key viewEpoch}<ModelViewer meshUrl={outputUrl} label="Dithered model" showLabel={false} viewerId="hybrid-output" {camera} progressActive={false}/>{/key}{#if !outputUrl}<div class="viewer-empty"><SparklesIcon size={32}/><strong>{busy ? 'Finding your colours…' : 'See what your filaments can do'}</strong><span>Choose your palette, then update the preview.</span></div>{/if}</div><div class="viewer-footer"><span>Print colour preview</span><span>Appearance uncalibrated</span></div></section>
+      </div>
+      <div class="palette-ribbon"><div class="palette-caption"><span class="eyebrow">THE PALETTE</span><strong>{activeTools} filament{activeTools === 1 ? '' : 's'}</strong></div><div class="palette-swatches">{#each tools.filter(t => t.role === 'color') as tool}<span class="palette-chip" title={tool.label}><i style:background={tool.color}></i>T{tool.tool}</span>{/each}{#if !activeTools}<span class="help-text">Select a filament to begin</span>{/if}</div><span class="process-chip">{options.sizeValue} mm <i>·</i> {options.layerHeight.toFixed(2)} mm layers</span></div>
+      <section class="correction-panel" aria-label="Colour corrections"><div class="correction-title"><span class="correction-icon"><PipetteIcon size={18}/></span><div><h2>Fine-tune a colour</h2><p>Sample the source, then choose a target.</p></div></div><div class="correction-controls"><button class:active={pickMode} class="secondary" disabled={!inputUrl || busy} onclick={pickSource}><PipetteIcon size={14}/>{pickMode ? 'Picking…' : 'Pick colour'}</button><div class="colour-pair"><input aria-label="Source correction colour" type="color" bind:value={sampledColor}/><ArrowRightIcon size={13}/><input aria-label="Target correction colour" type="color" bind:value={correctionColor}/></div><button class="icon-button" title="Add correction" aria-label="Add correction" disabled={busy || pins.length >= 8 || !project} onclick={addPin}><PlusIcon size={17}/></button></div>
+      {#if pins.length}<div class="correction-list">{#each pins as pin, i}<span class="correction-chip"><i style:background={pin.sourceHex}></i><ArrowRightIcon size={10}/><i style:background={pin.targetHex}></i><button class="text-button" aria-label={`Remove correction ${i + 1}`} disabled={busy} onclick={() => { pins = pins.filter((_, index) => index !== i); dirty = true; }}><XIcon size={12}/></button></span>{/each}<button class="text-button" disabled={busy} onclick={() => { pins = []; dirty = true; }}>Clear all</button><span>Applies to similar colours across the model.</span></div>{/if}</section>
+      <section class="print-panel"><div class="print-top"><div class="print-title"><span class="print-icon">{#if project?.printCurrent && !dirty}<CircleCheckIcon size={22}/>{:else}<FileBoxIcon size={22}/>{/if}</span><div><p class="eyebrow">FROM PREVIEW TO PRINT</p><h2>{project?.printCurrent && !dirty ? 'Your print project is ready.' : 'Make something worth holding.'}</h2><p>{project?.printCurrent && !dirty ? 'Native INDX project · reopened and sliced in PrusaSlicer alpha13' : 'Create a native INDX project, checked in PrusaSlicer before saving.'}</p></div></div><button class="primary export-button" disabled={!project || busy} onclick={() => runJob('build')}><FileBoxIcon size={16}/> Save print revision<ArrowRightIcon size={16}/></button></div>
+      {#if project?.validation}<div class="print-metrics"><div><span><Clock3Icon size={12}/>{project.printCurrent && !dirty ? 'Estimated print time' : 'Previous print time'}</span><strong>{project.validation.estimatedPrintTime || project.validation.printTime?.[0]?.split(' = ')[1] || 'See report'}</strong></div><div><span>Filament</span><strong>{project.validation.filamentGrams?.toFixed(2) || '—'} <small>g</small></strong></div><div><span>Tool changes</span><strong>{project.validation.toolChangeCount ?? '—'}</strong></div><a class="secondary download" href={`/api/download?name=${encodeURIComponent(project.name)}`}><ArrowDownToLineIcon size={15}/>{project.printCurrent && !dirty ? 'Download 3MF' : 'Previous 3MF'}</a></div><details class="diagnostics"><summary><span>Slice diagnostics <span class="notice-count">{project.validation.validation.warnings.length}</span></span><ChevronDownIcon size={13}/></summary><p>Not physically tested. Inspect fine colour regions before printing.</p>{#each project.validation.validation.warnings as warning}<p>{warning}</p>{/each}</details>{:else}<p class="print-note">Print time, filament use and tool changes appear after validation.</p>{/if}
       </section>
-      <footer class="workspace-footer"><span>Same project files in browser and chat.</span><span>PLA colour mixing · Supports reviewed separately</span></footer>
+      <footer class="workspace-footer"><span><Link2Icon size={11}/> One workspace, in browser and chat.</span><span>PLA colour · Supports reviewed separately</span></footer>
     </main>
   </div>
 </div>

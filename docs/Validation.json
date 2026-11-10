@@ -117,5 +117,47 @@
     "server": "127.0.0.1 only; launch command; shared project settings and locks",
     "physicalPrintTested": false,
     "inheritedGeometryFailureUnchanged": true
+  },
+  "travelAccess": {
+    "date": "2026-11-10",
+    "transport": "private HTTPS via Tailscale Serve",
+    "httpBind": "127.0.0.1:8874",
+    "httpsPort": 8447,
+    "deviceScope": "host Mac mini and selected owner MacBook only",
+    "checks": {
+      "pythonRegressionsPassed": 14,
+      "httpsRead": true,
+      "sameOriginAuthenticatedSave": true,
+      "browserPageAndMeshes": true,
+      "priorServeRoutesPreserved": true,
+      "launchAgentRunning": true,
+      "MacBookDirectVerification": "Not performed; SSH host key was unverified and was not bypassed."
+    },
+    "requirements": "Tailscale connected on both Macs; host awake, online and logged in. Personal origin/identity/IPs remain in ignored local configuration."
+  },
+  "studioDesign": {
+    "date": "2026-11-10",
+    "reference": "https://idither.com/job?U3ZpXAMBx&row=0",
+    "direction": "Warm light controls, dark modelling stage, physical filament swatches",
+    "checks": {
+      "frontendTypecheck": "0 errors, 0 warnings",
+      "hybridProductionBuild": "PASS",
+      "pythonRegressionsPassed": 14,
+      "browserHTTPS": true,
+      "responsiveWidths": [
+        390,
+        1280,
+        1920
+      ],
+      "horizontalOverflow": false,
+      "sourceAndResultMeshesLoaded": true,
+      "compareSourceResultModes": true,
+      "correctionAddRemoveAndStaleLabels": true,
+      "PETGSupportToolExcluded": true,
+      "projectReloadClearsUnsavedEdits": true
+    },
+    "scope": "UI and private travel access; no new print generated or submitted. Native print remains unchanged.",
+    "vercel": "Not deployed; recommended authenticated job queue with outbound Mac mini worker. A static frontend deployment alone cannot run the current native pipeline.",
+    "physicalColourComparison": "Not performed"
   }
 }

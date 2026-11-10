@@ -398,6 +398,9 @@ def main():
     for cmd in ("web", "launch"):
         p = subs.add_parser(cmd)
         p.add_argument("--port", type=int, default=8874)
+    p = subs.add_parser("remote")
+    p.add_argument("--device", required=True, help="Exact Tailscale DNS name of your travelling Mac.")
+    p.add_argument("--https-port", type=int, default=8447)
     p = subs.add_parser("validate")
     p.add_argument("file")
     args = parser.parse_args()
@@ -421,6 +424,9 @@ def main():
     elif args.command == "launch":
         from hybrid import launch
         result = launch(args.port)
+    elif args.command == "remote":
+        from hybrid import remote_access
+        result = remote_access(args.device, args.https_port)
     else:
         r = runtime()
         result = converter(r, "validate", Path(args.file).resolve(), "--slicer", r["slicer"])

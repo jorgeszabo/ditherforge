@@ -9,6 +9,13 @@ settings hashes and project locks: never overwrite another session's edits.
 `build --replace` archives the previous print only after the new revision
 validates. Rebuild the browser using `cd frontend && npm run build:hybrid`.
 
+Travel access uses a dedicated private Tailscale Serve route, configured by
+`dither-chat remote --device EXACT_MACBOOK_DNS`. Preserve existing Serve routes,
+loopback binding, identity/device allowlists and same-origin checks. Never use
+Funnel for this app. Local access configuration and owner identity stay in
+ignored `.local/`; do not commit them. The optional web LaunchAgent is installed
+with `python3 scripts/install-web-service.py` and starts after user login.
+
 - Default hardware: CORE One INDX 8T, eight 0.4 mm HF tools; alpha13.
 - Run `chat/dither-chat doctor` first. Rebuild with `scripts/build-indx.sh` after
   Go/profile changes; refresh profiles with `scripts/refresh-indx.cjs` after

@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import ipaddress
 import mimetypes
 from pathlib import Path
 import re
@@ -20,6 +21,29 @@ PROJECTS = indx.ROOT.parents[1]
 STATIC = indx.ROOT / "frontend/hybrid-dist"
 JOBS = {}
 JOB_LOCK = threading.Lock()
+
+
+def request_origin(headers, port, peer, remote):
+    """Trust Serve identity only via the loopback proxy and an exact configured origin."""
+    if not ipaddress.ip_address(peer).is_loopback:
+        raise PermissionError("The app accepts direct connections only from its local proxy.")
+    local_host = f"127.0.0.1:{port}"
+    forwarded = any(headers.get(k) for k in ("X-Forwarded-For", "X-Forwarded-Host", "Tailscale-User-Login", "Tailscale-Funnel-Request"))
+    if headers.get("Host") == local_host and not forwarded:
+        return "http://" + local_host
+    origin = remote.get("origin", "")
+    parsed = urlsplit(origin)
+    if parsed.scheme != "https" or parsed.netloc != headers.get("Host") or headers.get("X-Forwarded-Host") != parsed.netloc or headers.get("X-Forwarded-Proto") != "https":
+        raise PermissionError("This remote address is not configured for the studio.")
+    if headers.get("Tailscale-Funnel-Request") or headers.get("Tailscale-User-Login", "").casefold() not in {s.casefold() for s in remote.get("allowedLogins", [])}:
+        raise PermissionError("Access requires an approved Tailscale identity.")
+    try:
+        address = str(ipaddress.ip_address(headers.get("X-Forwarded-For", "")))
+    except ValueError:
+        raise PermissionError("Missing trusted Tailscale device address.")
+    if address not in remote.get("allowedClientIPs", []):
+        raise PermissionError("This device is not approved for the studio.")
+    return origin
 
 
 def project_path(name):
@@ -100,11 +124,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def local_request(self, mutation=False):
-        expected = f"127.0.0.1:{self.server.server_port}"
-        if self.headers.get("Host") != expected:
-            raise ValueError("Use this app's 127.0.0.1 address.")
-        if mutation and (self.headers.get("Origin") != "http://" + expected or self.headers.get("X-DitherForge") != "local"):
-            raise ValueError("Settings changes must originate from this local app.")
+        config = indx.ROOT / ".local/remote-access.json"
+        remote = indx.read(config) if config.is_file() else {}
+        expected = request_origin(self.headers, self.server.server_port, self.client_address[0], remote)
+        if mutation and (self.headers.get("Origin") != expected or self.headers.get("X-DitherForge") != "local"):
+            raise PermissionError("Settings changes must originate from this studio page.")
 
     def send_file(self, file, attachment=False):
         if not file.is_file():
@@ -159,6 +183,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not file.is_relative_to(STATIC.resolve()):
                     raise ValueError("Unknown app asset.")
                 self.send_file(file)
+        except PermissionError as exc:
+            self.send_json({"error": str(exc)}, 403)
         except (ValueError, KeyError, OSError, TypeError) as exc:
             self.send_json({"error": str(exc)}, 400)
 
@@ -204,6 +230,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(start_job(url.path.split("/")[-1], name))
                 else:
                     raise ValueError("Unknown action.")
+        except PermissionError as exc:
+            self.send_json({"error": str(exc)}, 403)
         except (ValueError, KeyError, OSError, TypeError, AttributeError) as exc:
             self.send_json({"error": str(exc)}, 400)
 
@@ -250,3 +278,31 @@ def launch(port=8874):
         except OSError:
             time.sleep(.1)
     raise ValueError(f"The local app is still starting; check {log}.")
+
+
+def remote_access(device, https_port=8447):
+    """Add a dedicated private Serve route without replacing any existing routes."""
+    state = json.loads(indx.run(["tailscale", "status", "--json"]))
+    host = state["Self"]
+    peer = next((p for p in state.get("Peer", {}).values() if p.get("DNSName", "").rstrip(".") == device.rstrip(".")), None)
+    if not peer or peer.get("UserID") != host.get("UserID"):
+        raise ValueError("Choose an existing Tailscale device owned by the same account.")
+    login = state.get("User", {}).get(str(host["UserID"]), {}).get("LoginName")
+    if not login:
+        raise ValueError("The Tailscale owner identity is unavailable.")
+    dns = host["DNSName"].rstrip(".")
+    before = json.loads(indx.run(["tailscale", "serve", "status", "--json"]))
+    web_key = f"{dns}:{https_port}"
+    proxy = {"Handlers": {"/": {"Proxy": "http://127.0.0.1:8874"}}}
+    if str(https_port) in before.get("TCP", {}) and before.get("Web", {}).get(web_key) != proxy:
+        raise ValueError("That Tailscale port already serves another app. Choose another port.")
+    config = {"origin": f"https://{web_key}", "allowedLogins": [login], "allowedClientIPs": host["TailscaleIPs"] + peer["TailscaleIPs"]}
+    indx.write(indx.ROOT / ".local/remote-access.json", config)
+    indx.write(indx.ROOT / ".local/serve-before.json", before)
+    indx.run(["tailscale", "serve", "--bg", f"--https={https_port}", "http://127.0.0.1:8874"])
+    after = json.loads(indx.run(["tailscale", "serve", "status", "--json"]))
+    for section in ("TCP", "Web"):
+        for key, value in before.get(section, {}).items():
+            if after.get(section, {}).get(key) != value:
+                raise ValueError("An existing Serve route changed; inspect .local/serve-before.json before continuing.")
+    return {"url": config["origin"], "devices": [host["HostName"], peer["HostName"]], "private": True, "existingRoutesPreserved": True}
