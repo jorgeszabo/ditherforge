@@ -4,6 +4,8 @@ build/bin/
 /ditherforge
 /ditherforge-cli
 /debug-render
+.local/
+__pycache__/
 
 # Frontend
 frontend/node_modules/

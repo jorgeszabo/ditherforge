@@ -104,7 +104,7 @@
   // Printer registry — populated on mount via ListPrinters(). Defines the
   // allowed nozzle diameters and layer heights for the selected printer.
   let printers = $state<main.PrinterOption[]>([]);
-  let printerId = $state('snapmaker_u1');
+  let printerId = $state('prusa_coreone_indx_8t');
   let nozzleDiameter = $state('0.4');
   let layerHeight = $state('0.20');
 

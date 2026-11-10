@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-10",
+  "upstreamCommit": "4d3552a434e8084d9b5fe573959a3493325be29f",
+  "hardware": "CORE One INDX 8T, eight 0.4 mm HF tools",
+  "slicer": "3.0.0-alpha13",
+  "vendorVersion": "1.0.21",
+  "dependencies": {
+    "manifold": "3.4.1 / 31afd71d17c7a94cfaeada83f657d7b42628ead6",
+    "dracoC": "d9a4da08378b222fe51fc0712a1f096c81d41b5d",
+    "go": "go version go1.27.3 darwin/arm64"
+  },
+  "checks": {
+    "targetedEnginePackages": "export3mf/settings/pipeline PASS",
+    "chatRegressions": "6 PASS",
+    "frontendTypecheck": "0 errors, 0 warnings",
+    "frontendProductionBuild": "PASS",
+    "nativeFourTools": {
+      "passed": true,
+      "physicalPrintTested": false,
+      "layerHeight": 0.15,
+      "outputSha256": "37e25e100c6cb32726e0565f012c10629dd27f10c47c3e7afa5a995e0de0463e",
+      "sourceSha256": "e24484e2a06f9b0fe86d259027c3715db86ba4b53e1d6074b7979d11e9a0dd67",
+      "gcodeFilamentTools": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "paintedTriangles": 7404,
+      "printTime": [
+        "; estimated printing time (normal mode) = 1h 6m 58s",
+        "; estimated printing time (silent mode) = 1h 12m 45s"
+      ],
+      "toolChanges": [
+        "; total toolchanges = 211"
+      ]
+    },
+    "nativeEightToolsSyntheticOnly": {
+      "passed": true,
+      "physicalPrintTested": false,
+      "layerHeight": 0.2,
+      "outputSha256": "002e6169baac96d165e635f0bb54c5c816b281236d6a63072f71667c10cdb2d4",
+      "sourceSha256": "732068afd47b021059301feac0e621e74c971b714708d8c7c4b9e67bbc702465",
+      "gcodeFilamentTools": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "paintedTriangles": 3003,
+      "printTime": [
+        "; estimated printing time (normal mode) = 1h 12m 5s",
+        "; estimated printing time (silent mode) = 1h 14m 41s"
+      ],
+      "toolChanges": [
+        "; total toolchanges = 280"
+      ]
+    }
+  },
+  "limitations": {
+    "physicallyPrinted": false,
+    "colorCalibrated": false,
+    "fullGoSuitePassed": false,
+    "inheritedFailure": "TestSampledMatchesInput/cube_dither",
+    "pristineUpstreamReproduced": true,
+    "topDepthHoleFraction": 0.002,
+    "bottomDepthHoleFraction": 0.0011,
+    "testLimit": 0.001,
+    "otherInternalPackages": "PASS with pinned Manifold; do not loosen the inherited failing test",
+    "sliceWarnings": {
+      "[error] [PhysicalPrinterStorage.cpp:42] Failed to load Physical Printer Configurations: No such file or directory": 1,
+      "[warning] [Voronoi.cpp:48] Detected missing Voronoi vertex, input polygons will be rotated back and forth.": 53,
+      "[error] [Voronoi.cpp:63] Detected missing Voronoi vertex even after the rotation of input.": 18,
+      "[warning] [SupportSpotsGenerator.hpp:40] SupportSpotsGenerator does not currently handle different materials properly, only first will be used": 2
+    }
+  }
+}

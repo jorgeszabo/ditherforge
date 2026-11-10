@@ -1,6 +1,51 @@
 {
   "printers": [
     {
+      "id": "prusa_coreone_indx_8t",
+      "display_name": "Prusa CORE One INDX 8T (0.4 HF)",
+      "nozzles": [
+        {
+          "diameter": "0.4",
+          "printer_settings_id": "Prusa CORE One INDX 8T 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF",
+          "machine_file": "machine_0.4.json",
+          "processes": [
+            {
+              "layer_height": 0.1,
+              "name": "0.10mm",
+              "file": "process_0.1.json",
+              "line_width": 0.45,
+              "initial_layer_line_width": 0.5,
+              "initial_layer_print_height": 0.2
+            },
+            {
+              "layer_height": 0.15,
+              "name": "0.15mm",
+              "file": "process_0.15.json",
+              "line_width": 0.45,
+              "initial_layer_line_width": 0.5,
+              "initial_layer_print_height": 0.2
+            },
+            {
+              "layer_height": 0.2,
+              "name": "0.20mm",
+              "file": "process_0.2.json",
+              "line_width": 0.45,
+              "initial_layer_line_width": 0.5,
+              "initial_layer_print_height": 0.2
+            },
+            {
+              "layer_height": 0.25,
+              "name": "0.25mm",
+              "file": "process_0.25.json",
+              "line_width": 0.45,
+              "initial_layer_line_width": 0.5,
+              "initial_layer_print_height": 0.2
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "snapmaker_u1",
       "display_name": "Snapmaker U1",
       "nozzles": [
@@ -485,7 +530,7 @@
               "name": "0.30mm Detail @Prusa XL 0.8",
               "file": "process_0.8_0.30.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             },
             {
@@ -493,7 +538,7 @@
               "name": "0.40mm Quality @Prusa XL 0.8",
               "file": "process_0.8_0.40.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             },
             {
@@ -501,7 +546,7 @@
               "name": "0.55mm Draft @Prusa XL 0.8",
               "file": "process_0.8_0.55.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             }
           ]
@@ -709,7 +754,7 @@
               "name": "0.30mm Detail @Prusa XL 5T 0.8",
               "file": "process_0.8_0.30.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             },
             {
@@ -717,7 +762,7 @@
               "name": "0.40mm Quality @Prusa XL 5T 0.8",
               "file": "process_0.8_0.40.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             },
             {
@@ -725,7 +770,7 @@
               "name": "0.55mm Draft @Prusa XL 5T 0.8",
               "file": "process_0.8_0.55.json",
               "line_width": 0.9,
-              "initial_layer_line_width": 1.0,
+              "initial_layer_line_width": 1,
               "initial_layer_print_height": 0.2
             }
           ]

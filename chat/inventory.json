@@ -1,0 +1,13 @@
+{
+  "description": "Last user-confirmed spools; verify at each print. Hex swatches are approximate, not measured. Unknown tools stay unavailable.",
+  "tools": [
+    {"tool": 1, "label": "Prusament PLA Vanilla White", "type": "PLA", "color": "#F5EAD0", "td": null, "role": "color"},
+    {"tool": 2, "label": "Prusament PLA Galaxy Black", "type": "PLA", "color": "#262626", "td": null, "role": "color"},
+    {"tool": 3, "label": "Prusament PLA Prusa Orange", "type": "PLA", "color": "#F36B21", "td": null, "role": "color"},
+    {"tool": 4, "label": "Prusament PLA Azure Blue", "type": "PLA", "color": "#0086D6", "td": null, "role": "color"},
+    {"tool": 5, "role": "unassigned"},
+    {"tool": 6, "role": "unassigned"},
+    {"tool": 7, "role": "unassigned"},
+    {"tool": 8, "label": "Prusament PETG Urban Gray", "type": "PETG", "color": "#858585", "td": null, "role": "support"}
+  ]
+}

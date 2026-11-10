@@ -1,5 +1,13 @@
 # DitherForge
 
+**Local INDX fork:** [Chat workflow](docs/CHAT_WORKFLOW.md) ·
+[Implementation and validation](docs/INDX.md) ·
+[Upstream](https://github.com/rtwfroody/ditherforge).
+This fork adds CORE One INDX 8T geometry profiles and a local, validated
+PrusaSlicer alpha13 handoff. Use `chat/dither-chat` for native INDX projects;
+the upstream GUI exporter still produces intermediate Orca-style 3MFs.
+Upstream attribution and MIT licensing are retained.
+
 ![Models printed with Ditherforge](images/showcase.png)
 
 Convert textured 3D models (GLB, 3MF, STL, OBJ, or COLLADA) into multi-color 3D-printable files

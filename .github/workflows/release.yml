@@ -322,7 +322,7 @@ jobs:
             ditherforge-*.dmg
 
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'rtwfroody/ditherforge' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     steps:

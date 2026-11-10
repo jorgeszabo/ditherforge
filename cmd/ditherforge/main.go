@@ -36,6 +36,7 @@ type Args struct {
 	DebugStagesDir string `arg:"--debug-stages-dir" help:"Write output-mesh stage renders (unculled / FrontSide-culled / culled-away-holes overlay, several views) into this directory. For chasing surface holes; needs no export."`
 	DebugStagesRes int    `arg:"--debug-stages-res" default:"2400" help:"PNG resolution (square) for --debug-stages-dir output"`
 	DebugSlabSVG   string `arg:"--debug-slab-svg" help:"Comma-separated slab indices: dump each slab's partition SVG (footprint + cover + cells + contours) to /tmp for inspecting coverage gaps."`
+	CacheDir       string `arg:"--cache-dir" help:"Override the local disk cache directory (use a separate directory when geometry dependencies change)."`
 }
 
 func (Args) Description() string {
@@ -116,7 +117,11 @@ func main() {
 	// Attach the same on-disk cache the GUI uses. ExportFile reads stage
 	// outputs back from disk, so a CLI run without disk attached can't
 	// export — the GUI configures this automatically in NewApp.
-	if dir, err := diskcache.DefaultDir(); err == nil {
+	cacheDir, cacheErr := diskcache.DefaultDir()
+	if args.CacheDir != "" {
+		cacheDir, cacheErr = args.CacheDir, nil
+	}
+	if dir, err := cacheDir, cacheErr; err == nil {
 		if d, derr := diskcache.Open(dir); derr == nil {
 			cache.SetDisk(d)
 		} else {

@@ -1,0 +1,22 @@
+{
+  "name": "Prusa CORE One INDX 8T 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF, 0.4 HF",
+  "printer_model": "COREONE_INDX",
+  "printer_variant": "8T HF0.4",
+  "nozzle_diameter": [
+    "0.4",
+    "0.4",
+    "0.4",
+    "0.4",
+    "0.4",
+    "0.4",
+    "0.4",
+    "0.4"
+  ],
+  "printable_area": [
+    "0x0",
+    "248x0",
+    "248x205",
+    "0x205"
+  ],
+  "printable_height": "270"
+}

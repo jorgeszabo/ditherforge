@@ -204,7 +204,7 @@ func Default() Settings {
 		SizeMode:                        "size",
 		SizeValue:                       "100",
 		ScaleValue:                      "1.0",
-		Printer:                         "snapmaker_u1",
+		Printer:                         "prusa_coreone_indx_8t",
 		NozzleDiameter:                  "0.4",
 		LayerHeight:                     "0.20",
 		BaseMaterialXTileMM:             0.1, // fraction of model max extent (was 10 mm)
