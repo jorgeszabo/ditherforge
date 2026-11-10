@@ -1,13 +1,76 @@
 {
-  "description": "Last user-confirmed spools; verify at each print. Hex swatches are approximate, not measured. Unknown tools stay unavailable.",
+  "description": "Required loadout: official Prusa ColorMix order, confirmed by Jorge for this test. This is not a query of physically loaded spools. Swatches from official material presets; TD unmeasured. Tool 8 reserved and unused.",
+  "source": "https://blog.prusa3d.com/prusament-pla-colormix-print-45-color-shades-using-just-five-filament-spools-and-more_137835/",
   "tools": [
-    {"tool": 1, "label": "Prusament PLA Vanilla White", "type": "PLA", "color": "#F5EAD0", "td": null, "role": "color"},
-    {"tool": 2, "label": "Prusament PLA Galaxy Black", "type": "PLA", "color": "#262626", "td": null, "role": "color"},
-    {"tool": 3, "label": "Prusament PLA Prusa Orange", "type": "PLA", "color": "#F36B21", "td": null, "role": "color"},
-    {"tool": 4, "label": "Prusament PLA Azure Blue", "type": "PLA", "color": "#0086D6", "td": null, "role": "color"},
-    {"tool": 5, "role": "unassigned"},
-    {"tool": 6, "role": "unassigned"},
-    {"tool": 7, "role": "unassigned"},
-    {"tool": 8, "label": "Prusament PETG Urban Gray", "type": "PETG", "color": "#858585", "td": null, "role": "support"}
+    {
+      "tool": 1,
+      "label": "Prusament PLA ColorMix Cyan",
+      "materialPreset": "Prusament PLA ColorMix Cyan@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#00AED5",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 2,
+      "label": "Prusament PLA ColorMix Magenta",
+      "materialPreset": "Prusament PLA ColorMix Magenta@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#D25B96",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 3,
+      "label": "Prusament PLA ColorMix Yellow",
+      "materialPreset": "Prusament PLA ColorMix Yellow@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#FFCE02",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 4,
+      "label": "Prusament PLA ColorMix White",
+      "materialPreset": "Prusament PLA ColorMix White@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#F1E8DD",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 5,
+      "label": "Prusament PLA ColorMix Black",
+      "materialPreset": "Prusament PLA ColorMix Black@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#544F4D",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 6,
+      "label": "Prusament PLA ColorMix Gold Glitter",
+      "materialPreset": "Prusament PLA ColorMix Gold Glitter@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#DDCAA9",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 7,
+      "label": "Prusament PLA ColorMix Silver Glitter",
+      "materialPreset": "Prusament PLA ColorMix Silver Glitter@COREONEINDX HF0.4@COREONEINDX 0.4",
+      "type": "PLA",
+      "color": "#A4A09F",
+      "td": null,
+      "role": "color"
+    },
+    {
+      "tool": 8,
+      "label": "Clear PETG \u2014 reserved, brand not specified",
+      "type": "PETG",
+      "role": "support",
+      "td": null
+    }
   ]
 }

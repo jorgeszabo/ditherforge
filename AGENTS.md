@@ -16,7 +16,7 @@ Funnel for this app. Local access configuration and owner identity stay in
 ignored `.local/`; do not commit them. The optional web LaunchAgent is installed
 with `python3 scripts/install-web-service.py` and starts after user login.
 
-- Default hardware: CORE One INDX 8T, eight 0.4 mm HF tools; alpha13.
+- Default hardware: CORE One INDX 8T, eight 0.4 mm HF tools; alpha14.
 - Run `chat/dither-chat doctor` first. Rebuild with `scripts/build-indx.sh` after
   Go/profile changes; refresh profiles with `scripts/refresh-indx.cjs` after
   installed presets change. Do not silently switch slicer versions.

@@ -61,7 +61,7 @@ loopback-bound so those headers can be trusted only from the local proxy.
    Unsaved/changed output is labelled as needing an update. Appearance is
    uncalibrated; a preview does not establish print readiness.
 5. **Save print revision** generates the actual native 3MF, reopens and slices
-   in alpha13 and checks per-tool G-code filament use. Only a passing candidate
+   in alpha14 and checks per-tool G-code filament use. Only a passing candidate
    replaces the current print. The prior 3MF and validation record are retained
    in a dated `Archive/` folder. Failed generation preserves the current print.
    Download the current validated 3MF, or the clearly labelled previous result.
@@ -88,7 +88,7 @@ enables validated archiving/replacement; ordinary `build` still protects an
 existing current file. Interactive caches and job logs remain in ignored
 `.local/`. Current deliverables follow the parent project's folder convention.
 
-The inherited geometry regression and alpha13 fine-region diagnostics described
+The inherited geometry regression and alpha14 fine-region diagnostics described
 in [INDX.md](INDX.md) are unchanged. Physical calibration and a small test print
 are still needed to assess colour accuracy. Adding a browser does not create
 measured optical recipes or regional painting capabilities.

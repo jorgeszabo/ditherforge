@@ -14,24 +14,26 @@ native validation. The local URL is http://127.0.0.1:8874/.
 On this Mac, run `chat/dither-chat doctor`. Reproduce the local installation
 with `scripts/setup-indx.sh` (Apple silicon macOS, Homebrew, Python 3, Node 24+).
 The maintained sibling `../3mf-colour-converter` is required. Setup uses
-official Prusa alpha13, an isolated data directory, CGAL, pinned Manifold 3.4.1,
+official Prusa alpha14, an isolated data directory, CGAL, pinned Manifold 3.4.1,
 and pinned Draco-C. Downloads, native libraries, logs and models are ignored
 under `.local/`; compiler/tool dependencies use Homebrew's ordinary locations.
 
-Re-query installed alpha13 presets using `node scripts/refresh-indx.cjs`, then
+Re-query installed alpha14 presets using `node scripts/refresh-indx.cjs`, then
 rebuild using `scripts/build-indx.sh --test`. The checked-in printer registry
 contains only geometry/process data. Full resolved native configuration stays
-in `.local/indx-profiles.json`. Never reuse alpha14 presets in alpha13's data
+in `.local/indx-profiles.json`. Never reuse alpha14 presets in alpha14's data
 directory. The isolated launcher prevents forced preset downgrades from touching
 the user's current PrusaSlicer installation.
 
 ## Inventory
 
-`chat/inventory.json` records the last confirmed spools, not a live printer
-query: tools 1 white PLA, 2 black PLA, 3 orange PLA, 4 blue PLA; 5–7 unknown;
-8 Urban Gray PETG reserved for supports. These are approximate sRGB swatches,
-not calibrated measurements. TD is null, so the chat workflow disables
-translucency compensation and uses opaque spatial dithering initially.
+`chat/inventory.json` records the prepared Prusament ColorMix loadout in Prusa's
+recommended order: T1 Cyan, T2 Magenta, T3 Yellow, T4 White, T5 Black,
+T6 Gold Glitter, T7 Silver Glitter. T8 is reserved for clear PETG (brand not
+specified), excluded from the colour palette. This is not a live printer query.
+The swatches come from official ColorMix presets, not measured print patches.
+TD remains null, so this workflow uses uncalibrated spatial dithering rather
+than Prusa's calibrated native ColorMix layer recipes.
 
 Update this inventory or pass a separate `--inventory FILE` when the user
 confirms new spools. There may be 1–8 colour tools, with non-contiguous tool
@@ -106,3 +108,24 @@ plus chat mapping regressions. `--test-all` additionally builds/checks the
 frontend and runs the full Go suite. Inspect the compact validation record and
 retained slice warnings. Use actual sliced times and tool changes when
 comparing candidates; dithering may be expensive even for a small object.
+
+## Prusament ColorMix and exact first-slice settings
+
+An inventory entry may include `materialPreset` naming an installed INDX PLA
+preset. It is preserved through palette reordering and browser saves. ColorMix
+jobs require 0.15 mm or finer layers and use 10% gyroid throughout the print and
+all tools. The UI offers only compatible layer heights. Native material settings
+come from the resolved preset, including 215 C / 50 C / 4 mm3/s for the installed
+ColorMix profiles. Do not substitute ordinary PLA cooling or flow settings.
+
+The first converter validation now uses the exact selected native process,
+1.5 mm segmented-region width and the designated physical infill/default tool.
+It no longer slices a default 0.20 mm intermediate before applying those values.
+The current default and validation runtime is alpha14, vendor 1.0.23; explicit
+legacy alpha13 validation remains supported by the converter. Existing projects
+retain their own recorded validation version until rebuilt.
+
+A selected backing/infill tool does not establish a completely white interior:
+painted regions can extend into infill. Inspect actual per-feature G-code before
+claiming an optical backing or calibrated colour. The turtle test exercises all
+seven tools and has no support extrusion; it remains physically untested.

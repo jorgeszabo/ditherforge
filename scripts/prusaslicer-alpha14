@@ -1,0 +1,10 @@
+#!/bin/sh
+# An isolated data directory prevents alpha14 presets/updater state affecting CLI validation.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+SLICER_APP=/Applications/PrusaSlicer-3.0.0-alpha14.app
+if [ ! -d "$SLICER_APP" ]; then
+  SLICER_APP="$ROOT/.local/deps/PrusaSlicer-3.0.0-alpha14.app"
+fi
+mkdir -p "$ROOT/.local/prusa-alpha14-data"
+exec "$SLICER_APP/Contents/MacOS/PrusaSlicer" --datadir "$ROOT/.local/prusa-alpha14-data" "$@"

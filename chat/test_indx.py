@@ -16,6 +16,12 @@ class ToolMappingTests(unittest.TestCase):
         mapping = palette_mapping([{"color": self.tools[7]["color"]}, {"color": self.tools[1]["color"]}], self.tools)
         self.assertEqual(mapping["map"], {"1": 8, "2": 2})
 
+    def test_specific_material_preset_survives_palette_reordering(self):
+        tools = copy.deepcopy(self.tools)
+        tools[0]["materialPreset"] = "Prusament PLA ColorMix Cyan"
+        mapping = palette_mapping([{"color": tools[1]["color"]}, {"color": tools[0]["color"]}], tools)
+        self.assertEqual(mapping["materials"]["1"], "Prusament PLA ColorMix Cyan")
+
     def test_reserved_support_tool_cannot_enter_colour_mix(self):
         tools = copy.deepcopy(self.tools)
         tools[7].update(role="support", type="PETG")

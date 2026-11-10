@@ -4,9 +4,9 @@
   import ModelViewer from './lib/components/ModelViewer.svelte';
   import { SharedCamera } from './lib/components/SharedCamera.svelte';
 
-  type Tool = { tool: number; label?: string; type?: string; color?: string; role: string; td?: number | null };
+  type Tool = { tool: number; label?: string; type?: string; color?: string; role: string; td?: number | null; materialPreset?: string };
   type Settings = { sizeValue: string; layerHeight: string; dither?: string; meshRepair?: string; brightness?: number; contrast?: number; saturation?: number; upperLayerXYScale?: number; colorSnap?: number; warpPins?: { sourceHex: string; targetHex: string; sigma: number }[] };
-  type Validation = { estimatedPrintTime?: string; filamentGrams?: number; toolChangeCount?: number; validation: { warnings: string[] }; printTime?: string[] };
+  type Validation = { slicer?: string; estimatedPrintTime?: string; filamentGrams?: number; toolChangeCount?: number; validation: { warnings: string[] }; printTime?: string[] };
   type Project = { name: string; sourceName: string; settings: Settings; settingsSha256: string; tools: Tool[]; previewReady: boolean; previewKey?: string; printCurrent: boolean; validation?: Validation };
   type Job = { id: string; kind: string; project: string; status: string; error?: string; progress?: string; started?: number };
 
@@ -31,8 +31,10 @@
   let sampledColor = $state('#808080');
   let correctionColor = $state('#0086d6');
   let layerChoices = $state<number[]>([0.10, 0.15, 0.20, 0.25]);
+  let slicerVersion = $state('3.0.0-alpha14');
   const busy = $derived(pending || uploading || job?.status === 'running');
   const activeTools = $derived(tools.filter(t => t.role === 'color').length);
+  const eligibleLayers = $derived(tools.some(t => t.role === 'color' && t.materialPreset?.includes('ColorMix')) ? layerChoices.filter(h => h <= 0.15) : layerChoices);
   const previewStale = $derived(dirty || previewHash !== project?.settingsSha256);
   const meshQuery = $derived(project?.previewReady ? `name=${encodeURIComponent(project.name)}&key=${project.previewKey}` : '');
   const inputUrl = $derived(meshQuery ? `/api/mesh?${meshQuery}&view=input` : undefined);
@@ -62,6 +64,7 @@
 
   async function refresh() {
     const state = await api('/api/state'); projects = state.projects;
+    slicerVersion = state.slicerVersion || slicerVersion;
     layerChoices = state.processes.map((p: { layer_height: number }) => p.layer_height);
     if (!selected && projects.length) await loadProject(projects[0]);
   }
@@ -107,7 +110,7 @@
     if (next.status === 'running') { window.setTimeout(() => poll(id).catch(e => { error = String(e); pending = false; job = null; }), 850); return; }
     if (next.status === 'error') { error = next.error || 'Generation failed. Your previous print is preserved.'; return; }
     await loadProject(next.project, false);
-    notice = next.kind === 'build' ? 'Native project saved after alpha13 reopen and slicing. Previous print revision archived when present.' : 'Preview updated. Rotate either view to compare the same angle.';
+    notice = next.kind === 'build' ? `Native project saved after ${project?.validation?.slicer || slicerVersion} reopen and slicing. Previous print revision archived when present.` : 'Preview updated. Rotate either view to compare the same angle.';
   }
 
   function toggleTool(tool: Tool) {
@@ -172,7 +175,7 @@
         </section>
         <section class="control-section" aria-label="Print and colour settings">
           <div class="section-heading"><h2><SlidersHorizontalIcon size={15}/> Print & colour</h2><span>0.4 HF</span></div>
-          <div class="two-fields"><label>Longest side<div class="unit-input"><input aria-label="Longest side in millimetres" type="number" min="1" max="300" bind:value={options.sizeValue} disabled={busy} oninput={() => dirty = true}/><span>mm</span></div></label><label>Layer height<select aria-label="Layer height" bind:value={options.layerHeight} disabled={busy} onchange={() => dirty = true}>{#each layerChoices as h}<option value={h}>{h.toFixed(2)} mm</option>{/each}</select></label></div>
+          <div class="two-fields"><label>Longest side<div class="unit-input"><input aria-label="Longest side in millimetres" type="number" min="1" max="300" bind:value={options.sizeValue} disabled={busy} oninput={() => dirty = true}/><span>mm</span></div></label><label>Layer height<select aria-label="Layer height" bind:value={options.layerHeight} disabled={busy} onchange={() => dirty = true}>{#each eligibleLayers as h}<option value={h}>{h.toFixed(2)} mm</option>{/each}</select></label></div>
           <label>Dither pattern<select aria-label="Dither pattern" bind:value={options.dither} disabled={busy} onchange={() => dirty = true}><option value="dlc-d30-p7">Dizzy · balanced</option><option value="riemersma">Riemersma</option><option value="floyd-steinberg">Floyd–Steinberg</option><option value="bn-adapt-5">Blue noise</option><option value="none">Solid colours only</option></select></label>
           <label class="range-label">Colour cell size<output>{options.upperLayerXYScale.toFixed(2)}×</output><input aria-label="Colour cell size" type="range" min="1" max="4" step="0.05" bind:value={options.upperLayerXYScale} disabled={busy} oninput={() => dirty = true}/></label><div class="range-endpoints"><span>More detail</span><span>Larger regions</span></div>
           <details class="fine-tuning"><summary>Fine tuning<ChevronDownIcon size={14}/></summary>
@@ -197,7 +200,7 @@
       <div class="palette-ribbon"><div class="palette-caption"><span class="eyebrow">THE PALETTE</span><strong>{activeTools} filament{activeTools === 1 ? '' : 's'}</strong></div><div class="palette-swatches">{#each tools.filter(t => t.role === 'color') as tool}<span class="palette-chip" title={tool.label}><i style:background={tool.color}></i>T{tool.tool}</span>{/each}{#if !activeTools}<span class="help-text">Select a filament to begin</span>{/if}</div><span class="process-chip">{options.sizeValue} mm <i>·</i> {options.layerHeight.toFixed(2)} mm layers</span></div>
       <section class="correction-panel" aria-label="Colour corrections"><div class="correction-title"><span class="correction-icon"><PipetteIcon size={18}/></span><div><h2>Fine-tune a colour</h2><p>Sample the source, then choose a target.</p></div></div><div class="correction-controls"><button class:active={pickMode} class="secondary" disabled={!inputUrl || busy} onclick={pickSource}><PipetteIcon size={14}/>{pickMode ? 'Picking…' : 'Pick colour'}</button><div class="colour-pair"><input aria-label="Source correction colour" type="color" bind:value={sampledColor}/><ArrowRightIcon size={13}/><input aria-label="Target correction colour" type="color" bind:value={correctionColor}/></div><button class="icon-button" title="Add correction" aria-label="Add correction" disabled={busy || pins.length >= 8 || !project} onclick={addPin}><PlusIcon size={17}/></button></div>
       {#if pins.length}<div class="correction-list">{#each pins as pin, i}<span class="correction-chip"><i style:background={pin.sourceHex}></i><ArrowRightIcon size={10}/><i style:background={pin.targetHex}></i><button class="text-button" aria-label={`Remove correction ${i + 1}`} disabled={busy} onclick={() => { pins = pins.filter((_, index) => index !== i); dirty = true; }}><XIcon size={12}/></button></span>{/each}<button class="text-button" disabled={busy} onclick={() => { pins = []; dirty = true; }}>Clear all</button><span>Applies to similar colours across the model.</span></div>{/if}</section>
-      <section class="print-panel"><div class="print-top"><div class="print-title"><span class="print-icon">{#if project?.printCurrent && !dirty}<CircleCheckIcon size={22}/>{:else}<FileBoxIcon size={22}/>{/if}</span><div><p class="eyebrow">FROM PREVIEW TO PRINT</p><h2>{project?.printCurrent && !dirty ? 'Your print project is ready.' : 'Make something worth holding.'}</h2><p>{project?.printCurrent && !dirty ? 'Native INDX project · reopened and sliced in PrusaSlicer alpha13' : 'Create a native INDX project, checked in PrusaSlicer before saving.'}</p></div></div><button class="primary export-button" disabled={!project || busy} onclick={() => runJob('build')}><FileBoxIcon size={16}/> Save print revision<ArrowRightIcon size={16}/></button></div>
+      <section class="print-panel"><div class="print-top"><div class="print-title"><span class="print-icon">{#if project?.printCurrent && !dirty}<CircleCheckIcon size={22}/>{:else}<FileBoxIcon size={22}/>{/if}</span><div><p class="eyebrow">FROM PREVIEW TO PRINT</p><h2>{project?.printCurrent && !dirty ? 'Your print project is ready.' : 'Make something worth holding.'}</h2><p>{project?.printCurrent && !dirty ? `Native INDX project · reopened and sliced in PrusaSlicer ${(project.validation?.slicer || slicerVersion).replace('3.0.0-', '')}` : 'Create a native INDX project, checked in PrusaSlicer before saving.'}</p></div></div><button class="primary export-button" disabled={!project || busy} onclick={() => runJob('build')}><FileBoxIcon size={16}/> Save print revision<ArrowRightIcon size={16}/></button></div>
       {#if project?.validation}<div class="print-metrics"><div><span><Clock3Icon size={12}/>{project.printCurrent && !dirty ? 'Estimated print time' : 'Previous print time'}</span><strong>{project.validation.estimatedPrintTime || project.validation.printTime?.[0]?.split(' = ')[1] || 'See report'}</strong></div><div><span>Filament</span><strong>{project.validation.filamentGrams?.toFixed(2) || '—'} <small>g</small></strong></div><div><span>Tool changes</span><strong>{project.validation.toolChangeCount ?? '—'}</strong></div><a class="secondary download" href={`/api/download?name=${encodeURIComponent(project.name)}`}><ArrowDownToLineIcon size={15}/>{project.printCurrent && !dirty ? 'Download 3MF' : 'Previous 3MF'}</a></div><details class="diagnostics"><summary><span>Slice diagnostics <span class="notice-count">{project.validation.validation.warnings.length}</span></span><ChevronDownIcon size={13}/></summary><p>Not physically tested. Inspect fine colour regions before printing.</p>{#each project.validation.validation.warnings as warning}<p>{warning}</p>{/each}</details>{:else}<p class="print-note">Print time, filament use and tool changes appear after validation.</p>{/if}
       </section>
       <footer class="workspace-footer"><span><Link2Icon size={11}/> One workspace, in browser and chat.</span><span>PLA colour · Supports reviewed separately</span></footer>

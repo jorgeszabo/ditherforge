@@ -4,17 +4,17 @@ set -eu
 cd "$(dirname "$0")/.."
 HOMEBREW_NO_AUTO_UPDATE=1 brew install go cmake cgal pkg-config
 mkdir -p .local/deps .local/runs
-if [ ! -d /Applications/PrusaSlicer-3.0.0-alpha13.app ] && [ ! -d .local/deps/PrusaSlicer-3.0.0-alpha13.app ]; then
-  IMAGE=.local/deps/PrusaSlicer-3.0.0-alpha13.dmg
-  curl -fL https://github.com/prusa3d/PrusaSlicer/releases/download/version_3.0.0-alpha13/PrusaSlicer-3.0.0-alpha13.dmg -o "$IMAGE"
+if [ ! -d /Applications/PrusaSlicer-3.0.0-alpha14.app ] && [ ! -d .local/deps/PrusaSlicer-3.0.0-alpha14.app ]; then
+  IMAGE=.local/deps/PrusaSlicer-3.0.0-alpha14.dmg
+  curl -fL https://github.com/prusa3d/PrusaSlicer/releases/download/version_3.0.0-alpha14/PrusaSlicer-3.0.0-alpha14.dmg -o "$IMAGE"
   python3 - "$IMAGE" <<'PY'
 import hashlib,sys
-assert hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest() == '811de1535304dc14c7061d5b5a4b557525c5241f24f96674ea9272f7ac7d03ab', 'Prusa download checksum mismatch'
+assert hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest() == '9ae809965f0facaf868ff7ea38927b53ce6ed7da901acca5a1d99bed3446eaf1', 'Prusa download checksum mismatch'
 PY
   MOUNT=$(mktemp -d /tmp/dither-prusa.XXXXXX)
   trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rmdir "$MOUNT" 2>/dev/null || true' EXIT
   hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" "$IMAGE"
-  ditto "$MOUNT/PrusaSlicer-3.0.0-alpha13.app" .local/deps/PrusaSlicer-3.0.0-alpha13.app
+  ditto "$MOUNT/PrusaSlicer-3.0.0-alpha14.app" .local/deps/PrusaSlicer-3.0.0-alpha14.app
   hdiutil detach "$MOUNT"
   rmdir "$MOUNT"
   trap - EXIT

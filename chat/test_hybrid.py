@@ -28,7 +28,7 @@ class HybridTests(unittest.TestCase):
         source.write_bytes(b"test source")
         self.settings = self.project / "Source/Dither.json"
         self.tool = {"tool": 1, "label": "Test white", "color": "#FFFFFF", "type": "PLA", "role": "color", "td": None}
-        indx.write(self.root / ".local/indx-profiles.json", {"processes": {"detail": {"layerHeight": .15}}})
+        indx.write(self.root / ".local/indx-profiles.json", {"materials": {indx.MATERIAL: {"type": "PLA"}, "Prusament PLA ColorMix White": {"type": "PLA"}}, "processes": {"detail": {"layerHeight": .15}, "draft": {"layerHeight": .2}}})
         indx.write(self.root / "chat/processes.json", {"processes": [{"layer_height": .15}]})
         indx.write(self.root / "chat/inventory.json", {"tools": [self.tool]})
         indx.write(self.settings, {"settings": {"inputFile": "../Reference/fixture.glb", "printer": indx.PRINTER, "nozzleDiameter": "0.4", "layerHeight": "0.15", "colorSlots": [{"hex": "#FFFFFF"}]}, "_indx": {"sourceSha256": indx.sha(source), "tools": [self.tool]}})
@@ -67,6 +67,20 @@ class HybridTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 indx.configure(self.settings, change, before)
             self.assertEqual(indx.sha(self.settings), before)
+
+    def test_colormix_profile_and_layer_limit_are_checked_before_save(self):
+        before = indx.sha(self.settings)
+        unknown = {**self.tool, "materialPreset": "Unknown PLA"}
+        with self.assertRaisesRegex(ValueError, "installed"):
+            indx.configure(self.settings, {"tools": [unknown]}, before)
+        self.assertEqual(indx.sha(self.settings), before)
+        cm = {**self.tool, "materialPreset": "Prusament PLA ColorMix White"}
+        indx.configure(self.settings, {"tools": [cm]}, before)
+        before = indx.sha(self.settings)
+        indx.write(self.root / "chat/processes.json", {"processes": [{"layer_height": .15}, {"layer_height": .2}]})
+        with self.assertRaisesRegex(ValueError, "0.15 mm"):
+            indx.configure(self.settings, {"layerHeight": .2}, before)
+        self.assertEqual(indx.sha(self.settings), before)
 
     def test_project_busy_in_chat_prevents_browser_save(self):
         with indx.project_lock(self.settings):

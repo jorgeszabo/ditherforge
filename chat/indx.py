@@ -89,10 +89,11 @@ def runtime():
     r["slicer"] = os.environ.get("PRUSA_SLICER", r["slicer"])
     r["converter"] = os.environ.get("THREEMF_CONVERTER", r["converter"])
     version = run([r["slicer"], "--version"])
-    if version != "3.0.0-alpha13":
-        raise ValueError(f"Expected alpha13, got {version}. Do not silently change slicing versions.")
+    if version != read(ROOT / "chat/processes.json")["slicerVersion"]:
+        raise ValueError(f"Expected the configured slicer version, got {version}. Do not silently change slicing versions.")
     if not (ROOT / "build/bin/ditherforge-cli").is_file():
         raise ValueError("Build the engine with scripts/build-indx.sh first.")
+    r["slicerVersion"] = version
     return r
 
 
@@ -130,7 +131,7 @@ def palette_mapping(filaments, tools):
         if t is None:
             raise ValueError(f"Engine exported unexpected palette colour {f['color']}; refusing guessed tool mapping.")
         mapping["map"][str(source)] = t["tool"]
-        mapping["materials"][str(t["tool"])] = MATERIAL
+        mapping["materials"][str(t["tool"])] = t.get("materialPreset", MATERIAL)
         mapping["colors"][str(t["tool"])] = t["color"].upper()
     return mapping
 
@@ -144,19 +145,27 @@ def gcode_tools(text):
     return selections, used
 
 
-def checked_settings(file):
-    doc = read(file)
+def checked_settings(file, document=None):
+    doc = read(file) if document is None else document
     s, meta = doc["settings"], doc["_indx"]
     tools = color_tools({"tools": meta["tools"]})
     if s["printer"] != PRINTER or float(s["nozzleDiameter"]) != 0.4:
         raise ValueError("Expected the INDX 8T 0.4 HF configuration.")
     profiles = read(ROOT / ".local/indx-profiles.json")
+    for t in tools:
+        preset = t.get("materialPreset", MATERIAL)
+        if preset not in profiles["materials"] or profiles["materials"][preset]["type"] != "PLA":
+            raise ValueError(f"Tool {t['tool']} needs an installed INDX PLA material preset: {preset}")
     process = next((p for p in profiles["processes"].values() if abs(p["layerHeight"] - float(s["layerHeight"])) < 1e-6), None)
     if process is None:
         raise ValueError("Layer height needs an exact installed INDX process; nearest-profile substitution is disabled.")
+    if any("ColorMix" in t.get("materialPreset", "") for t in tools) and float(s["layerHeight"]) > 0.15:
+        raise ValueError("Prusament ColorMix needs a layer height of 0.15 mm or finer.")
     expected = {t["color"].upper() for t in tools}
     if len(s["colorSlots"]) != len(tools) or {c["hex"].upper() for c in s["colorSlots"] if c} != expected:
         raise ValueError("Palette changed independently of physical tool inventory; update the inventory and re-init.")
+    if s.get("infillFilament") and s["infillFilament"].upper() not in expected:
+        raise ValueError("The infill filament must be one of the selected colour tools.")
     source = (Path(file).parent / s["inputFile"]).resolve()
     if sha(source) != meta["sourceSha256"]:
         raise ValueError("Source changed since init; re-init the project deliberately.")
@@ -201,6 +210,8 @@ def configure(settings, patch, expected_hash):
                 doc["_indx"]["calibrated"] = False
                 doc["settings"]["colorSlots"] = [{"hex": t["color"].upper(), "label": t["label"], "td": t.get("td") or 1} for t in chosen]
                 doc["settings"]["honorTD"] = all(t.get("td") is not None for t in chosen)
+        # Reject invalid profile/layer edits before publishing them.
+        checked_settings(settings, doc)
         write(settings, doc)
         return {"settingsSha256": sha(settings)}
 
@@ -272,7 +283,7 @@ def init(args):
     return {"settings": str(settings), "tools": [t["tool"] for t in tools], "calibrated": False, "tdConfigured": td_configured}
 
 
-def patch_native(source, dest, process, bed_model, infill_tool):
+def patch_native(source, dest, process, bed_model, infill_tool, colormix=False):
     with zipfile.ZipFile(source) as z:
         p = json.loads(z.read("Metadata/PrusaSlicer3_project.json"))
         g = p["config_containers"][0]
@@ -285,6 +296,16 @@ def patch_native(source, dest, process, bed_model, infill_tool):
         c["print_settings"]["mmu_segmented_region_max_width"] = 1.5
         # Explicit PLA bed selection; a reserved PETG tool must never raise it.
         c["print_settings"]["bed_temperature_extruder"] = infill_tool
+        # Palette slot one is the engine's designated backing/infill, which
+        # can map to any physical tool after export palette reordering.
+        for key in ("infill_extruder", "solid_infill_extruder", "perimeter_extruder"):
+            c["print_settings"][key] = infill_tool
+        if colormix:
+            # Prusa recommends 5–10% gyroid for these translucent filaments.
+            overrides = {"fill_density": {"value": 10, "is_percent": True}, "fill_pattern": "gyroid", "support_material_threshold": 55}
+            c["print_settings"].update(copy.deepcopy(overrides))
+            for key, value in overrides.items():
+                c["toolprint_settings"][key] = [copy.deepcopy(value) for _ in range(8)]
         asset = Path(bed_model).resolve()
         if not asset.is_file():
             raise ValueError(f"Missing installed bed display model: {asset}")
@@ -315,16 +336,20 @@ def build(args):
     run([ROOT / "build/bin/ditherforge-cli", settings, "--output", intermediate, "--cache-dir", ROOT / ".local/cache/manifold-3.4.1", "--preview-dir", interactive, "--debug-render", previews, "--debug-render-res", "640"], work / "dither.log", progress=True)
     info = converter(r, "inspect", intermediate)
     mapping = palette_mapping(info["filaments"], tools)
+    # The converter's first reopen/slice must use the same geometry schedule
+    # and paint penetration as the final project, not the 0.20 mm fallback.
+    mapping.update(process=process["print"]["name"], segmentedRegionMaxWidth=1.5, infillTool=mapping["map"]["1"])
     write(work / "mapping.json", mapping)
     plan = converter(r, "plan", intermediate, "--bed", "1", "--config", work / "mapping.json")
     if plan["target"]["vendorVersion"] != read(ROOT / "chat/processes.json")["vendorVersion"]:
-        raise ValueError("Converter and DitherForge profile versions differ. Refresh both using isolated alpha13 before proceeding.")
+        raise ValueError("Converter and DitherForge profile versions differ. Refresh both using the selected slicer before proceeding.")
     write(work / "conversion-plan.json", plan)
     stage = work / "converted.3mf"
     print("Converting and validating the native INDX project…", file=sys.stderr, flush=True)
     converter(r, "convert", intermediate, "--bed", "1", "--config", work / "mapping.json", "--slicer", r["slicer"], "--output", stage, "--accept-settings-changes", log=work / "convert.log")
     native = work / "native.3mf"
-    patch_native(stage, native, process, r["bedModel"], mapping["map"]["1"])
+    colormix = all("Prusament PLA ColorMix " in t.get("materialPreset", "") for t in tools)
+    patch_native(stage, native, process, r["bedModel"], mapping["map"]["1"], colormix)
     validation = converter(r, "validate", native, "--slicer", r["slicer"], log=work / "validate.log")
     if not validation.get("passed"):
         raise ValueError("Native reopen-and-slice did not pass.")
@@ -338,7 +363,7 @@ def build(args):
     expected = sorted(native_info["usedColors"])
     if not set(expected).issubset(used) or not set(selected).issubset({t["tool"] for t in tools}):
         raise ValueError(f"G-code selections {selected} / filament-use tools {used} disagree with painted tools {expected} / inventory.")
-    report = {"passed": True, "physicalPrintTested": False, "printer": "CORE One INDX 8T / 8 x 0.4 HF", "slicer": "3.0.0-alpha13",
+    report = {"passed": True, "physicalPrintTested": False, "printer": "CORE One INDX 8T / 8 x 0.4 HF", "slicer": r["slicerVersion"],
               "layerHeight": process["layerHeight"], "settingsSha256": settings_hash, "sourceSha256": sha(source), "outputSha256": sha(native),
               "output": str(output), "paletteMapping": mapping, "gcodeToolSelections": selected, "gcodeFilamentTools": used, "paintedTriangles": native_info["paintedTriangles"],
               "calibrated": doc["_indx"]["calibrated"], "validation": validation, "workDirectory": str(work),
@@ -370,7 +395,7 @@ def build(args):
     write(project / "Source/Validation.json", report)
     write(interactive / "preview.json", {"settingsSha256": settings_hash, "directory": str(interactive), "input": str(interactive / "input.mesh"), "output": str(interactive / "output.mesh"), "validated": False})
     colour_status = "TD-informed and uncalibrated" if doc["settings"].get("honorTD") else "approximate and uncalibrated; opaque dithering is used"
-    (project / "README.md").write_text(f"# {project.name}\n\n[Current print project](Print%20Files/{output.name.replace(' ', '%20')})\n\nCORE One INDX 8T, eight 0.4 mm HF tools; PrusaSlicer alpha13, {process['layerHeight']} mm layers. Prusament PLA; colour tools {selected}.\n\nNative reopen and fresh slice passed. **Not physically tested.** Colour swatches are {colour_status}.\n\n[Dither settings](Source/Dither.json) · [Validation and SHA-256](Source/Validation.json) · [Original model](Reference/{source.name.replace(' ', '%20')}) · [Previews](Reference/Previews/)\n\nSlice diagnostics are retained in Validation.json; inspect geometry/colour coverage before printing. This is an experimental dithered surface, not a calibrated optical recipe.\n\nTool 8 is reserved for PETG in the default inventory. This project does not automatically add supports or PETG interfaces. Review model-specific supports before printing.\n")
+    (project / "README.md").write_text(f"# {project.name}\n\n[Current print project](Print%20Files/{output.name.replace(' ', '%20')})\n\nCORE One INDX 8T, eight 0.4 mm HF tools; PrusaSlicer {r['slicerVersion']}, {process['layerHeight']} mm layers. Prusament PLA; colour tools {selected}.\n\nNative reopen and fresh slice passed. **Not physically tested.** Colour swatches are {colour_status}.\n\n[Dither settings](Source/Dither.json) · [Validation and SHA-256](Source/Validation.json) · [Original model](Reference/{source.name.replace(' ', '%20')}) · [Previews](Reference/Previews/)\n\nSlice diagnostics are retained in Validation.json; inspect geometry/colour coverage before printing. This is an experimental dithered surface, not a calibrated optical recipe.\n\nTool 8 is reserved for PETG in the default inventory. This project does not automatically add supports or PETG interfaces. Review model-specific supports before printing.\n")
     with (project / "README.md").open("a") as f:
         f.write(f"\nNormal-mode estimate: {report['estimatedPrintTime']}, {report['filamentGrams']} g, {report['toolChangeCount']} tool changes.\n")
     return report

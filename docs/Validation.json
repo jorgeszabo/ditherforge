@@ -159,5 +159,43 @@
     "scope": "UI and private travel access; no new print generated or submitted. Native print remains unchanged.",
     "vercel": "Not deployed; recommended authenticated job queue with outbound Mac mini worker. A static frontend deployment alone cannot run the current native pipeline.",
     "physicalColourComparison": "Not performed"
+  },
+  "colorMixTurtleAlpha14": {
+    "date": "2026-11-10",
+    "slicer": "3.0.0-alpha14",
+    "vendorVersion": "1.0.23",
+    "passed": true,
+    "physicalPrintTested": false,
+    "tools": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "estimatedPrintTime": "1h 54m 28s",
+    "filamentGrams": 6.4,
+    "toolChanges": 340,
+    "outputSha256": "87c53e06e707d854e20742bd09edcf581d4f114355e13ed6e7f750245025830d",
+    "settingsSha256": "6e7ee8c7154392e01a123f84fbbaa28861101636a898d36cb0e106aa1c2ee762",
+    "checks": {
+      "converterTests": 32,
+      "pythonTests": 16,
+      "targetedGoPackages": "PASS",
+      "frontendTypecheck": "0 errors, 0 warnings",
+      "hybridBuild": "PASS",
+      "HTTPSProjectVersion": "3.0.0-alpha14",
+      "invalidColorMixLayerRejectedWithoutMutation": true,
+      "nativeMaterialPresetsRetained": true,
+      "supportsExtrusionMoves": 0
+    },
+    "notes": [
+      "First native validation now uses exact 0.15 mm schedule and 1.5 mm segmented-region width, avoiding the alpha13 default-process crash observed for this model.",
+      "White default tool does not imply an all-white interior; painted infill remains.",
+      "Original solid is watertight; fragmented painted export is not topologically watertight. Alpha14 reopen and slice pass; recoverable Voronoi warnings retained.",
+      "UI window inspection was unavailable because the Mac was locked. No physical print submitted."
+    ]
   }
 }

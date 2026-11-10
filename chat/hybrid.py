@@ -151,7 +151,8 @@ class Handler(BaseHTTPRequestHandler):
             params = parse_qs(url.query)
             if url.path == "/api/state":
                 names = sorted(p.name for p in PROJECTS.iterdir() if p.is_dir() and (p / "Source/Dither.json").is_file() and p.resolve().parent == PROJECTS.resolve())
-                self.send_json({"app": "DitherForge INDX Hybrid", "projects": names, "processes": indx.read(indx.ROOT / "chat/processes.json")["processes"]})
+                profiles = indx.read(indx.ROOT / "chat/processes.json")
+                self.send_json({"app": "DitherForge INDX Hybrid", "projects": names, "processes": profiles["processes"], "slicerVersion": profiles.get("slicerVersion", "")})
             elif url.path == "/api/project":
                 self.send_json(project_state(params["name"][0]))
             elif url.path == "/api/job":

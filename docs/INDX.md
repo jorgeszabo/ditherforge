@@ -13,7 +13,7 @@ presets resolved by PrusaSlicer, with its source/version/hash recorded.
 
 - CORE One INDX 8T registry entry for eight 0.4 mm HF tools. Actual alpha13
   geometry defaults determine voxel width and first-layer/layer heights.
-- Native alpha13 3MF delivery through the maintained converter, with fresh
+- Native alpha14 3MF delivery through the maintained converter, with fresh
   final reopen/slice and per-tool G-code filament-use verification.
 - Reordered palette mapping, sparse physical tool numbers, eight-colour
   capability, and exclusion of reserved/unknown spools.
