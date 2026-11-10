@@ -5,7 +5,7 @@ from indx import color_tools, palette_mapping, gcode_tools
 
 class ToolMappingTests(unittest.TestCase):
     def setUp(self):
-        self.tools = [{"tool": i, "role": "color", "type": "PLA", "color": f"#{i:02X}2244", "td": None} for i in range(1, 9)]
+        self.tools = [{"tool": i, "label": f"Test spool {i}", "role": "color", "type": "PLA", "color": f"#{i:02X}2244", "td": None} for i in range(1, 9)]
 
     def test_eight_tools_survive_reordered_palette(self):
         palette = [{"color": t["color"]} for t in reversed(self.tools)]

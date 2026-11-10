@@ -4,7 +4,10 @@
 [Implementation and validation](docs/INDX.md) ·
 [Upstream](https://github.com/rtwfroody/ditherforge).
 This fork adds CORE One INDX 8T geometry profiles and a local, validated
-PrusaSlicer alpha13 handoff. Use `chat/dither-chat` for native INDX projects;
+PrusaSlicer alpha13 handoff. Run **`dither-chat launch`** to start the local
+browser workspace at http://127.0.0.1:8874 (or `chat/dither-chat launch`).
+Browser and chat share the same editable project files and validation pipeline.
+Use `chat/dither-chat` for native INDX projects;
 the upstream GUI exporter still produces intermediate Orca-style 3MFs.
 Upstream attribution and MIT licensing are retained.
 

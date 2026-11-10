@@ -10,6 +10,7 @@ __pycache__/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/hybrid-dist/
 frontend/package.json.md5
 frontend/vite.config.js
 frontend/vite.config.d.ts

@@ -3,13 +3,12 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
-	"unsafe"
 
+	"github.com/rtwfroody/ditherforge/internal/meshpreview"
 	"github.com/rtwfroody/ditherforge/internal/pipeline"
 )
 
@@ -68,34 +67,6 @@ import (
 //	  If 1:
 //	    uint32 nSimColors          (= face count * 3, uint16 [r,g,b] per face)
 //	    uint16[nSimColors]         (per-cell print-simulation colors, 0..255)
-func float32SliceToBytes(s []float32) []byte {
-	if len(s) == 0 {
-		return nil
-	}
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*4)
-}
-
-func uint32SliceToBytes(s []uint32) []byte {
-	if len(s) == 0 {
-		return nil
-	}
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*4)
-}
-
-func uint16SliceToBytes(s []uint16) []byte {
-	if len(s) == 0 {
-		return nil
-	}
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*2)
-}
-
-func int32SliceToBytes(s []int32) []byte {
-	if len(s) == 0 {
-		return nil
-	}
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*4)
-}
-
 type meshHandler struct {
 	mu     sync.RWMutex
 	meshes map[string]*pipeline.MeshData
@@ -143,132 +114,5 @@ func (h *meshHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 
-	nVerts := uint32(len(mesh.Vertices))
-	nFaces := uint32(len(mesh.Faces))
-	nColors := uint32(len(mesh.FaceColors))
-	nUVs := uint32(len(mesh.UVs))
-	nTexIdx := uint32(len(mesh.FaceTextureIdx))
-
-	// Header.
-	var hdr [20]byte
-	binary.LittleEndian.PutUint32(hdr[0:], nVerts)
-	binary.LittleEndian.PutUint32(hdr[4:], nFaces)
-	binary.LittleEndian.PutUint32(hdr[8:], nColors)
-	binary.LittleEndian.PutUint32(hdr[12:], nUVs)
-	binary.LittleEndian.PutUint32(hdr[16:], nTexIdx)
-	w.Write(hdr[:])
-
-	// Write typed slices as raw bytes (little-endian on LE platforms,
-	// which covers all supported targets).
-	w.Write(float32SliceToBytes(mesh.Vertices))
-	w.Write(uint32SliceToBytes(mesh.Faces))
-	w.Write(uint16SliceToBytes(mesh.FaceColors))
-	w.Write(float32SliceToBytes(mesh.UVs))
-	w.Write(int32SliceToBytes(mesh.FaceTextureIdx))
-
-	// Textures (base64 strings).
-	nTex := uint32(0)
-	if mesh.Textures != nil {
-		nTex = uint32(len(mesh.Textures))
-	}
-	var tmp [4]byte
-	binary.LittleEndian.PutUint32(tmp[:], nTex)
-	w.Write(tmp[:])
-	for _, tex := range mesh.Textures {
-		b := []byte(tex)
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(b)))
-		w.Write(tmp[:])
-		w.Write(b)
-	}
-
-	// Sticker overlay section.
-	if len(mesh.StickerUVs) > 0 && mesh.StickerAtlas != "" {
-		binary.LittleEndian.PutUint32(tmp[:], 1) // hasStickerData
-		w.Write(tmp[:])
-
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.StickerUVs)))
-		w.Write(tmp[:])
-		w.Write(float32SliceToBytes(mesh.StickerUVs))
-
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.StickerFaceMask)))
-		w.Write(tmp[:])
-		w.Write(mesh.StickerFaceMask)
-
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.StickerBounds)))
-		w.Write(tmp[:])
-		w.Write(float32SliceToBytes(mesh.StickerBounds))
-
-		atlasBytes := []byte(mesh.StickerAtlas)
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(atlasBytes)))
-		w.Write(tmp[:])
-		w.Write(atlasBytes)
-	} else {
-		binary.LittleEndian.PutUint32(tmp[:], 0) // no sticker data
-		w.Write(tmp[:])
-	}
-
-	// MaterialX preview atlas (optional). Image as base64 PNG/JPEG
-	// (matches sticker atlas convention); per-face-vertex UVs
-	// indexed alongside the unpacked face buffer the frontend builds.
-	if atl := mesh.BaseColorAtlas; atl != nil && atl.Image != "" && len(atl.FaceVertexUVs) > 0 {
-		binary.LittleEndian.PutUint32(tmp[:], 1) // hasBaseColorAtlas
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(atl.Width))
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(atl.Height))
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(atl.FaceVertexUVs)))
-		w.Write(tmp[:])
-		w.Write(float32SliceToBytes(atl.FaceVertexUVs))
-		imgBytes := []byte(atl.Image)
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(imgBytes)))
-		w.Write(tmp[:])
-		w.Write(imgBytes)
-	} else {
-		binary.LittleEndian.PutUint32(tmp[:], 0) // no atlas
-		w.Write(tmp[:])
-	}
-
-	// Per-face alpha (optional). Carries continuous per-face alpha
-	// for the input preview so the renderer can blend translucent
-	// faces; texture alpha is handled per-pixel via the texture
-	// itself.
-	if len(mesh.FaceAlpha) > 0 {
-		binary.LittleEndian.PutUint32(tmp[:], 1) // hasFaceAlpha
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.FaceAlpha)))
-		w.Write(tmp[:])
-		w.Write(mesh.FaceAlpha)
-	} else {
-		binary.LittleEndian.PutUint32(tmp[:], 0) // no per-face alpha
-		w.Write(tmp[:])
-	}
-
-	// Per-face render class (optional): 0 = opaque, 1 = cutout (alpha
-	// test), 2 = blend. Lets the renderer draw each face per-fragment —
-	// alpha-testing cutout faces (so they still write depth) and routing
-	// only genuinely translucent faces to the depth-write-off blend pass.
-	if len(mesh.FaceRenderClass) > 0 {
-		binary.LittleEndian.PutUint32(tmp[:], 1) // hasFaceRenderClass
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.FaceRenderClass)))
-		w.Write(tmp[:])
-		w.Write(mesh.FaceRenderClass)
-	} else {
-		binary.LittleEndian.PutUint32(tmp[:], 0) // no render class
-		w.Write(tmp[:])
-	}
-
-	// Per-cell print-simulation colors (optional): flat uint16 [r,g,b] per
-	// face, the neighbor-blended effective color for the print-sim preview.
-	if len(mesh.SimFaceColors) > 0 {
-		binary.LittleEndian.PutUint32(tmp[:], 1) // hasSimColors
-		w.Write(tmp[:])
-		binary.LittleEndian.PutUint32(tmp[:], uint32(len(mesh.SimFaceColors)))
-		w.Write(tmp[:])
-		w.Write(uint16SliceToBytes(mesh.SimFaceColors))
-	} else {
-		binary.LittleEndian.PutUint32(tmp[:], 0) // no sim colors
-		w.Write(tmp[:])
-	}
+	_ = meshpreview.Write(w, mesh)
 }

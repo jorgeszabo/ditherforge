@@ -249,6 +249,16 @@ jobs:
           # a generous hang-backstop, not a target.
           go test -timeout 15m ./...
 
+      - name: Check hybrid browser and chat interface
+        if: runner.os == 'Linux'
+        run: |
+          cd frontend
+          npm ci --ignore-scripts
+          npm run check
+          npm run build:hybrid
+          cd ..
+          python3 -m unittest discover -s chat -p 'test_*.py'
+
       # --- Package ---
 
       - name: Package (Linux)

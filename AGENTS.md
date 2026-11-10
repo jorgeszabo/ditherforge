@@ -3,6 +3,12 @@
 Read `docs/CHAT_WORKFLOW.md` before printing/converting. Use `chat/dither-chat`
 for chat work. This fork lives only in `3D-Printing/Tools/ditherforge`.
 
+The browser workspace starts with `dither-chat launch` (loopback only). It uses
+the same `configure`, `preview` and `build` functions as chat. Preserve shared
+settings hashes and project locks: never overwrite another session's edits.
+`build --replace` archives the previous print only after the new revision
+validates. Rebuild the browser using `cd frontend && npm run build:hybrid`.
+
 - Default hardware: CORE One INDX 8T, eight 0.4 mm HF tools; alpha13.
 - Run `chat/dither-chat doctor` first. Rebuild with `scripts/build-indx.sh` after
   Go/profile changes; refresh profiles with `scripts/refresh-indx.cjs` after

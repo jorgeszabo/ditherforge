@@ -77,5 +77,45 @@
       "[error] [Voronoi.cpp:63] Detected missing Voronoi vertex even after the rotation of input.": 18,
       "[warning] [SupportSpotsGenerator.hpp:40] SupportSpotsGenerator does not currently handle different materials properly, only first will be used": 2
     }
+  },
+  "hybrid": {
+    "date": "2026-11-10",
+    "pythonTests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "goPackages": "root app, meshpreview, CLI, export3mf, settings and pipeline PASS",
+    "frontendTypecheck": "0 errors, 0 warnings",
+    "browserBuild": "PASS",
+    "desktopBuild": "PASS",
+    "browserVerified": [
+      "linked model orbit",
+      "GLB input/output coordinate agreement",
+      "browser save visible to chat",
+      "chat edit reloaded in browser",
+      "click-to-sample colour correction",
+      "preview refresh",
+      "native export from browser",
+      "previous revision archived with matching hash",
+      "current settings and exported file hashes agree"
+    ],
+    "nativeExport": {
+      "passed": true,
+      "layerHeight": 0.15,
+      "settingsSha256": "2bd12ff78584d302035b9a444fa9654bd239a735ac2767c06b25b051371ea797",
+      "outputSha256": "77075edb30f96e449a08e961ae7f5d0f946dcfe92e3007faed87361a3227e91d",
+      "gcodeFilamentTools": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "estimatedPrintTime": "1h 6m 58s",
+      "filamentGrams": 4.17,
+      "toolChangeCount": 211
+    },
+    "server": "127.0.0.1 only; launch command; shared project settings and locks",
+    "physicalPrintTested": false,
+    "inheritedGeometryFailureUnchanged": true
   }
 }

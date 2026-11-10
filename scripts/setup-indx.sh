@@ -37,4 +37,5 @@ cmake --install .local/deps/manifold/build
 mv .local/deps/manifold-install/lib/libmanifold-combined.a .local/deps/manifold-install/lib/libmanifold.a
 node scripts/refresh-indx.cjs
 scripts/build-indx.sh --test
+(cd frontend && npm ci --ignore-scripts && npm run check && npm run build:hybrid)
 chat/dither-chat doctor

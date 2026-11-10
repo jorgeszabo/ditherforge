@@ -2,7 +2,11 @@
 """Local INDX orchestration. DitherForge and the maintained 3MF converter run as CLIs."""
 import argparse
 from collections import Counter
+from contextlib import contextmanager
 import copy
+from datetime import datetime
+import fcntl
+from functools import wraps
 import hashlib
 import json
 import os
@@ -26,17 +30,55 @@ def read(path):
 def write(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as f:
+        f.write(json.dumps(data, indent=2) + "\n")
+    Path(f.name).replace(path)
 
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def run(args, log=None, json_output=False):
-    p = subprocess.run([str(x) for x in args], capture_output=True, text=True)
-    if log:
-        Path(log).write_text(p.stdout + p.stderr)
+@contextmanager
+def project_lock(settings):
+    folder = ROOT / ".local/locks"
+    folder.mkdir(parents=True, exist_ok=True)
+    key = hashlib.sha256(str(Path(settings).resolve()).encode()).hexdigest()
+    with (folder / key).open("w") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("This project is busy in chat or the browser. Wait for that job to finish.")
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def locked(fn):
+    @wraps(fn)
+    def call(args):
+        with project_lock(args.settings):
+            return fn(args)
+    return call
+
+
+def run(args, log=None, json_output=False, progress=False):
+    command = [str(x) for x in args]
+    if progress:
+        lines = []
+        with Path(log).open("w") as trace:
+            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in p.stdout:
+                trace.write(line); trace.flush()
+                print(line, end="", file=sys.stderr, flush=True)
+                lines.append(line)
+            p.wait()
+        p = subprocess.CompletedProcess(command, p.returncode, "".join(lines), "")
+    else:
+        p = subprocess.run(command, capture_output=True, text=True)
+        if log:
+            Path(log).write_text(p.stdout + p.stderr)
     if p.returncode:
         raise ValueError(f"Command failed ({p.returncode}): {args[0]}\n{p.stderr[-2500:]}\nSee {log or 'command output'}")
     return json.loads(p.stdout) if json_output else (p.stdout + p.stderr).strip()
@@ -69,6 +111,8 @@ def color_tools(inventory, selected=None):
     if not chosen or len(chosen) > 8:
         raise ValueError("Choose 1–8 known colour tools.")
     for t in chosen:
+        if not isinstance(t.get("label"), str) or not t["label"].strip():
+            raise ValueError("Give every selected spool a name before using it.")
         if t.get("type") != "PLA" or not re.fullmatch(r"#[0-9a-fA-F]{6}", t.get("color", "")):
             raise ValueError("The initial workflow requires known PLA swatches; keep PETG out of the colour mix.")
         if t.get("td") is not None and (not isinstance(t["td"], (float, int)) or t["td"] <= 0):
@@ -117,6 +161,74 @@ def checked_settings(file):
     if sha(source) != meta["sourceSha256"]:
         raise ValueError("Source changed since init; re-init the project deliberately.")
     return doc, source, tools, process
+
+
+def configure(settings, patch, expected_hash):
+    """Validate a browser/chat edit and atomically update the shared project file."""
+    with project_lock(settings):
+        if sha(settings) != expected_hash:
+            raise ValueError("Settings changed in another session. Reload the project before saving.")
+        doc, _, _, _ = checked_settings(settings)
+        ranges = {"sizeValue": (1, 300), "layerHeight": (0.1, 0.25), "brightness": (-100, 100),
+                  "contrast": (-100, 100), "saturation": (-100, 100), "upperLayerXYScale": (1, 4), "colorSnap": (0, 50)}
+        enums = {"dither": {"dlc-d30-p7", "floyd-steinberg", "riemersma", "bn-adapt-5", "none"}, "meshRepair": {"none", "fwn", "alphawrap"}}
+        if set(patch) - (set(ranges) | set(enums) | {"tools", "warpPins"}):
+            raise ValueError("Unsupported settings field.")
+        for key, value in patch.items():
+            if key in ranges:
+                lo, hi = ranges[key]
+                if not isinstance(value, (int, float)) or not lo <= value <= hi:
+                    raise ValueError(f"{key} must be between {lo} and {hi}.")
+                if key == "layerHeight" and not any(abs(p["layer_height"] - value) < 1e-6 for p in read(ROOT / "chat/processes.json")["processes"]):
+                    raise ValueError("Choose an exact installed layer height.")
+                doc["settings"][key] = str(value) if key in {"sizeValue", "layerHeight"} else value
+            elif key in enums:
+                if value not in enums[key]:
+                    raise ValueError(f"Unsupported {key}.")
+                doc["settings"][key] = value
+            elif key == "warpPins":
+                if not isinstance(value, list) or len(value) > 8:
+                    raise ValueError("At most eight colour corrections are supported.")
+                for pin in value:
+                    if any(not re.fullmatch(r"#[0-9a-fA-F]{6}", pin.get(k, "")) for k in ("sourceHex", "targetHex")) or not 1 <= float(pin.get("sigma", 0)) <= 100:
+                        raise ValueError("A colour correction needs two colours and a reach between 1 and 100.")
+                doc["settings"][key] = value
+            else:
+                if not isinstance(value, list) or len(value) > 8:
+                    raise ValueError("Provide up to eight physical tool entries.")
+                chosen = color_tools({"tools": value})
+                doc["_indx"]["tools"] = value
+                doc["_indx"]["calibrated"] = False
+                doc["settings"]["colorSlots"] = [{"hex": t["color"].upper(), "label": t["label"], "td": t.get("td") or 1} for t in chosen]
+                doc["settings"]["honorTD"] = all(t.get("td") is not None for t in chosen)
+        write(settings, doc)
+        return {"settingsSha256": sha(settings)}
+
+
+def preview_directory(settings):
+    binary = ROOT / "build/bin/ditherforge-cli"
+    key = hashlib.sha256((sha(settings) + str(binary.stat().st_mtime_ns)).encode()).hexdigest()
+    return ROOT / ".local/previews" / key
+
+
+@locked
+def preview(args):
+    runtime()
+    settings = Path(args.settings).resolve()
+    checked_settings(settings)
+    digest = sha(settings)
+    dest = preview_directory(settings)
+    receipt = dest / "preview.json"
+    if receipt.is_file() and all((dest / n).is_file() for n in ("input.mesh", "output.mesh")):
+        return read(receipt)
+    dest.mkdir(parents=True, exist_ok=True)
+    print("Generating interactive source and dithered meshes…", file=sys.stderr, flush=True)
+    run([ROOT / "build/bin/ditherforge-cli", settings, "--preview-dir", dest, "--preview-only", "--cache-dir", ROOT / ".local/cache/manifold-3.4.1"], dest / "preview.log", progress=True)
+    if sha(settings) != digest or not all((dest / n).is_file() for n in ("input.mesh", "output.mesh")):
+        raise ValueError("Settings changed during preview, or preview meshes were not produced.")
+    result = {"settingsSha256": digest, "directory": str(dest), "input": str(dest / "input.mesh"), "output": str(dest / "output.mesh"), "validated": False}
+    write(receipt, result)
+    return result
 
 
 def init(args):
@@ -182,21 +294,25 @@ def patch_native(source, dest, process, bed_model, infill_tool):
                 out.writestr(name, json.dumps(p).encode() if name == "Metadata/PrusaSlicer3_project.json" else z.read(name))
 
 
+@locked
 def build(args):
     r = runtime()
     settings = Path(args.settings).resolve()
+    settings_hash = sha(settings)
     doc, source, tools, process = checked_settings(settings)
     project = settings.parent.parent
     if settings.parent.name != "Source":
         raise ValueError("Keep the settings in the project's Source folder.")
     output = project / "Print Files" / f"{project.name} - INDX8T - PLA.3mf"
-    if output.exists():
+    previous_hash = sha(output) if output.exists() else None
+    if output.exists() and not getattr(args, "replace", False):
         raise ValueError("Current print file exists. Archive it deliberately before rebuilding.")
     work = Path(tempfile.mkdtemp(prefix="run-", dir=ROOT / ".local/runs"))
     print(f"Dithering {source.name}; work: {work}", file=sys.stderr, flush=True)
     previews = work / "previews"
+    interactive = preview_directory(settings)
     intermediate = work / "dithered.3mf"
-    run([ROOT / "build/bin/ditherforge-cli", settings, "--output", intermediate, "--cache-dir", ROOT / ".local/cache/manifold-3.4.1", "--debug-render", previews, "--debug-render-res", "640"], work / "dither.log")
+    run([ROOT / "build/bin/ditherforge-cli", settings, "--output", intermediate, "--cache-dir", ROOT / ".local/cache/manifold-3.4.1", "--preview-dir", interactive, "--debug-render", previews, "--debug-render-res", "640"], work / "dither.log", progress=True)
     info = converter(r, "inspect", intermediate)
     mapping = palette_mapping(info["filaments"], tools)
     write(work / "mapping.json", mapping)
@@ -223,7 +339,7 @@ def build(args):
     if not set(expected).issubset(used) or not set(selected).issubset({t["tool"] for t in tools}):
         raise ValueError(f"G-code selections {selected} / filament-use tools {used} disagree with painted tools {expected} / inventory.")
     report = {"passed": True, "physicalPrintTested": False, "printer": "CORE One INDX 8T / 8 x 0.4 HF", "slicer": "3.0.0-alpha13",
-              "layerHeight": process["layerHeight"], "sourceSha256": sha(source), "outputSha256": sha(native),
+              "layerHeight": process["layerHeight"], "settingsSha256": settings_hash, "sourceSha256": sha(source), "outputSha256": sha(native),
               "output": str(output), "paletteMapping": mapping, "gcodeToolSelections": selected, "gcodeFilamentTools": used, "paintedTriangles": native_info["paintedTriangles"],
               "calibrated": doc["_indx"]["calibrated"], "validation": validation, "workDirectory": str(work),
               "printTime": re.findall(r"^; estimated printing time.*$", text, re.M), "toolChanges": re.findall(r"^; total toolchanges.*$", text, re.M)}
@@ -231,6 +347,15 @@ def build(args):
     report["filamentGrams"] = float(re.search(r"^; total filament used \[g\] = (.+)$", text, re.M).group(1))
     report["toolChangeCount"] = int(re.search(r"^; total toolchanges = (\d+)$", text, re.M).group(1))
     output.parent.mkdir(parents=True, exist_ok=True)
+    if sha(settings) != settings_hash or (sha(output) if output.exists() else None) != previous_hash:
+        raise ValueError("Settings or current print changed while slicing. Current output was preserved.")
+    if previous_hash:
+        archive = project / "Archive" / datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        archive.mkdir(parents=True)
+        shutil.copy2(output, archive / output.name)
+        if (project / "Source/Validation.json").is_file():
+            shutil.copy2(project / "Source/Validation.json", archive / "Validation.json")
+        report["archivedPreviousPrint"] = str(archive)
     pending = output.with_suffix(f".pending-{os.getpid()}")
     try:
         shutil.copy2(native, pending)
@@ -243,6 +368,7 @@ def build(args):
         for name in ("input_persp.png", "input_front.png", "dithered_persp.png", "dithered_front.png"):
             shutil.copy2(previews / name, preview_dest / name)
     write(project / "Source/Validation.json", report)
+    write(interactive / "preview.json", {"settingsSha256": settings_hash, "directory": str(interactive), "input": str(interactive / "input.mesh"), "output": str(interactive / "output.mesh"), "validated": False})
     colour_status = "TD-informed and uncalibrated" if doc["settings"].get("honorTD") else "approximate and uncalibrated; opaque dithering is used"
     (project / "README.md").write_text(f"# {project.name}\n\n[Current print project](Print%20Files/{output.name.replace(' ', '%20')})\n\nCORE One INDX 8T, eight 0.4 mm HF tools; PrusaSlicer alpha13, {process['layerHeight']} mm layers. Prusament PLA; colour tools {selected}.\n\nNative reopen and fresh slice passed. **Not physically tested.** Colour swatches are {colour_status}.\n\n[Dither settings](Source/Dither.json) · [Validation and SHA-256](Source/Validation.json) · [Original model](Reference/{source.name.replace(' ', '%20')}) · [Previews](Reference/Previews/)\n\nSlice diagnostics are retained in Validation.json; inspect geometry/colour coverage before printing. This is an experimental dithered surface, not a calibrated optical recipe.\n\nTool 8 is reserved for PETG in the default inventory. This project does not automatically add supports or PETG interfaces. Review model-specific supports before printing.\n")
     with (project / "README.md").open("a") as f:
@@ -261,9 +387,17 @@ def main():
     p.add_argument("--tools", help="Comma-separated physical colour tool numbers; support-role tools are excluded.")
     p.add_argument("--size", type=float, default=50)
     p.add_argument("--layer", type=float, default=0.15)
-    for cmd in ("plan", "build"):
+    for cmd in ("plan", "build", "preview", "configure"):
         p = subs.add_parser(cmd)
         p.add_argument("settings")
+        if cmd == "build":
+            p.add_argument("--replace", action="store_true", help="Archive the previous print only after a new revision validates.")
+        if cmd == "configure":
+            p.add_argument("--patch", required=True, help="JSON file containing only supported settings changes.")
+            p.add_argument("--expected-hash", required=True)
+    for cmd in ("web", "launch"):
+        p = subs.add_parser(cmd)
+        p.add_argument("--port", type=int, default=8874)
     p = subs.add_parser("validate")
     p.add_argument("file")
     args = parser.parse_args()
@@ -276,6 +410,17 @@ def main():
         result = {"source": str(source), "layerHeight": process["layerHeight"], "tools": tools, "calibrated": doc["_indx"]["calibrated"], "status": "Planning only; existing print validation is recorded separately in Source/Validation.json"}
     elif args.command == "build":
         result = build(args)
+    elif args.command == "preview":
+        result = preview(args)
+    elif args.command == "configure":
+        result = configure(args.settings, read(args.patch), args.expected_hash)
+    elif args.command == "web":
+        from hybrid import serve
+        serve(args.port)
+        return
+    elif args.command == "launch":
+        from hybrid import launch
+        result = launch(args.port)
     else:
         r = runtime()
         result = converter(r, "validate", Path(args.file).resolve(), "--slicer", r["slicer"])

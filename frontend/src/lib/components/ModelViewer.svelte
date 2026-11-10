@@ -17,7 +17,8 @@
 
 
   function log(msg: string) {
-    LogMessage('info', msg);
+    // The shared viewer also runs in the local browser, outside the Wails host.
+    try { LogMessage('info', msg).catch(() => {}); } catch {}
   }
 
   import { SharedCamera } from './SharedCamera.svelte';

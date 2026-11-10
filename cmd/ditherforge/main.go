@@ -15,6 +15,7 @@ import (
 	"github.com/rtwfroody/ditherforge/internal/debugrender"
 	"github.com/rtwfroody/ditherforge/internal/diskcache"
 	"github.com/rtwfroody/ditherforge/internal/export3mf"
+	"github.com/rtwfroody/ditherforge/internal/meshpreview"
 	"github.com/rtwfroody/ditherforge/internal/pipeline"
 	"github.com/rtwfroody/ditherforge/internal/progress"
 	"github.com/rtwfroody/ditherforge/internal/settings"
@@ -37,6 +38,8 @@ type Args struct {
 	DebugStagesRes int    `arg:"--debug-stages-res" default:"2400" help:"PNG resolution (square) for --debug-stages-dir output"`
 	DebugSlabSVG   string `arg:"--debug-slab-svg" help:"Comma-separated slab indices: dump each slab's partition SVG (footprint + cover + cells + contours) to /tmp for inspecting coverage gaps."`
 	CacheDir       string `arg:"--cache-dir" help:"Override the local disk cache directory (use a separate directory when geometry dependencies change)."`
+	PreviewDir     string `arg:"--preview-dir" help:"Write interactive input/output binary preview meshes to this directory."`
+	PreviewOnly    bool   `arg:"--preview-only" help:"Run the colour pipeline and write previews without a 3MF export."`
 }
 
 func (Args) Description() string {
@@ -129,6 +132,23 @@ func main() {
 		}
 	}
 	cb := &pipeline.Callbacks{Progress: progress.NewCLITracker()}
+	var previewErr error
+	if args.PreviewDir != "" {
+		if err := os.MkdirAll(args.PreviewDir, 0755); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		cb.OnInputMesh = func(mesh *pipeline.MeshData, previewScale, _ float32, _, _ [3]float32) {
+			if mesh != nil {
+				// The desktop preview frame can differ from pipeline millimetres
+				// (notably GLB metre units). Match the output frame for linked views.
+				if previewScale > 0 {
+					mesh = pipeline.ScalePreviewMesh(mesh, 1/previewScale)
+				}
+				previewErr = writePreview(filepath.Join(args.PreviewDir, "input.mesh"), mesh)
+			}
+		}
+	}
 
 	// Env-gated CPU profiling (harmless when unset). Pair with
 	// DITHERFORGE_STOP_AFTER_LOAD=1 to profile just the load phase.
@@ -209,6 +229,18 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: model extent %.0f mm exceeds 300 mm; reduce the size in the settings file (or pass --force to bypass)\n", pr.ModelExtentMM)
 		os.Exit(1)
 	}
+	if args.PreviewDir != "" && pr.OutputMesh != nil {
+		if previewErr == nil {
+			previewErr = writePreview(filepath.Join(args.PreviewDir, "output.mesh"), pr.OutputMesh)
+		}
+		if previewErr != nil {
+			fmt.Fprintln(os.Stderr, previewErr)
+			os.Exit(1)
+		}
+	}
+	if args.PreviewOnly {
+		return
+	}
 
 	// Output-mesh stage renders for surface-defect hunting. Independent of
 	// export (renders pr.OutputMesh directly), so it runs before ExportFile.
@@ -260,6 +292,22 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func writePreview(path string, mesh *pipeline.MeshData) error {
+	f, err := os.Create(path + ".pending")
+	if err != nil {
+		return err
+	}
+	err = meshpreview.Write(f, mesh)
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return os.Rename(path+".pending", path)
 }
 
 // writeDebugRenders writes PNG renders of three things to dir:

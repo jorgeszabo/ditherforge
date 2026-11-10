@@ -16,11 +16,11 @@ export CGO_LDFLAGS="-L$PWD/.local/deps/manifold-install/lib -L$BREW_PREFIX/lib -
 mkdir -p build/bin
 go build -tags customenv,draco,cgal -o build/bin/ditherforge-cli ./cmd/ditherforge
 if [ "${1:-}" = "--test" ]; then
-  go test -tags customenv,draco,cgal -timeout 10m ./internal/export3mf ./internal/settings ./internal/pipeline
+  go test -tags customenv,draco,cgal -timeout 10m ./internal/export3mf ./internal/settings ./internal/pipeline ./internal/meshpreview ./cmd/ditherforge
   python3 -m unittest discover -s chat -p 'test_*.py'
 fi
 if [ "${1:-}" = "--test-all" ]; then
-  (cd frontend && npm ci --ignore-scripts && npm run check && npm run build)
+  (cd frontend && npm ci --ignore-scripts && npm run check && npm run build && npm run build:hybrid)
   go test -tags customenv,draco,cgal -timeout 10m ./...
   python3 -m unittest discover -s chat -p 'test_*.py'
 fi

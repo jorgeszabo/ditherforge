@@ -5,6 +5,10 @@ https://github.com/jorgeszabo/ditherforge. Upstream remains the `upstream`
 remote. The user chooses material, colour, size, supports and physical-print
 decisions in chat; this tool handles repeatable geometry, mapping and validation.
 
+For the browser + chat workspace, run `dither-chat launch` and read
+[HYBRID.md](HYBRID.md). Both interfaces use the same project settings and
+native validation. The local URL is http://127.0.0.1:8874/.
+
 ## Setup and health
 
 On this Mac, run `chat/dither-chat doctor`. Reproduce the local installation
@@ -84,7 +88,8 @@ Project Name/
 The project contains eight physical HF tools and only the intended active
 colours. Single-material child volumes inherit their object's selection;
 multi-material surface paint is deliberate. Existing current print files are
-protected: archive a useful superseded revision deliberately before rebuilding.
+protected: archive a useful superseded revision deliberately before rebuilding,
+or use `build --replace` to archive it after a new candidate validates.
 Native reopen/slice and G-code generation are mandatory. Slicing is not a
 physical colour/adhesion test. No model upload, print submission or automatic
 account activity occurs.

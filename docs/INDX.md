@@ -7,6 +7,10 @@ presets resolved by PrusaSlicer, with its source/version/hash recorded.
 
 ## What is implemented
 
+- [Local browser + chat interface](HYBRID.md): linked interactive 3D views,
+  eight tool controls, point-sampled colour corrections, shared settings with
+  conflict detection, preview jobs and validated native export/revision history.
+
 - CORE One INDX 8T registry entry for eight 0.4 mm HF tools. Actual alpha13
   geometry defaults determine voxel width and first-layer/layer heights.
 - Native alpha13 3MF delivery through the maintained converter, with fresh
