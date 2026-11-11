@@ -197,5 +197,57 @@
       "Original solid is watertight; fragmented painted export is not topologically watertight. Alpha14 reopen and slice pass; recoverable Voronoi warnings retained.",
       "UI window inspection was unavailable because the Mac was locked. No physical print submitted."
     ]
+  },
+  "realisticTurtleAlpha14": {
+    "date": "2026-11-11",
+    "slicer": "3.0.0-alpha14",
+    "vendorVersion": "1.0.23",
+    "passed": true,
+    "physicalPrintTested": false,
+    "outputSha256": "323ef728f1b50da1ebf4515e47b90bdf40002481ae0ce87605e14c30bf09a70b",
+    "sourceSha256": "fa46e648c3b1081e15082ea0fc5e2058f62b874503bc4f9f32b6fe0aa40bd688",
+    "settingsSha256": "cc08b815c3e336544e398a591712a4a6ba895aa95e5a2859db93abea4d0d0f23",
+    "estimatedPrintTime": "5h 35m 50s",
+    "filamentGrams": 19.19,
+    "toolChangeCount": 915,
+    "modelTools": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "supportInterface": {
+      "tool": 8,
+      "materialPreset": "Generic PETG @COREONEINDX HF0.4@COREONEINDX 0.4",
+      "used": true,
+      "gcodeCheck": {
+        "firstPETGInterfaceZ": 0.8,
+        "firstLayerTools": [
+          4
+        ],
+        "supportBodyTools": [
+          4
+        ],
+        "supportInterfaceTools": [
+          8
+        ]
+      }
+    },
+    "checks": {
+      "pythonRegressionsPassed": 18,
+      "converterRegressionsPassed": 33,
+      "sourceHash": true,
+      "outputHash": true,
+      "nativeReopenAndFreshSlice": true,
+      "firstLayerPLAOnly": true
+    },
+    "limitations": [
+      "Colour uncalibrated; no physical print.",
+      "Fragmented painted export has open boundaries; native slice passed with recorded Voronoi recovery errors.",
+      "Clear PETG brand not confirmed; Generic PETG is an editable baseline."
+    ]
   }
 }

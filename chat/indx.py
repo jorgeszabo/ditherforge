@@ -145,6 +145,54 @@ def gcode_tools(text):
     return selections, used
 
 
+def check_support_gcode(text, body_tool, interface_tool):
+    """Check emitted relative-extrusion feature paths, including the PLA raft."""
+    tool, kind, z = None, "Custom", None
+    body, interface, first_layer = set(), set(), set()
+    interface_z = []
+    for line in text.splitlines():
+        match = re.match(r"\s*T(\d+)\b", line)
+        if match:
+            tool = int(match[1]) + 1
+        if line.startswith(";TYPE:"):
+            kind = line[6:]
+        if line.startswith(";Z:"):
+            z = float(line[3:])
+        if not re.match(r"G[0123]\s", line) or z is None or kind == "Custom":
+            continue
+        words = dict(re.findall(r"\b([XYE])(-?(?:\d+(?:\.\d*)?|\.\d+))", line))
+        if float(words.get("E", 0)) <= 0 or not ({"X", "Y"} & words.keys()):
+            continue
+        if z <= 0.20001:
+            first_layer.add(tool)
+        if "interface" in kind.lower():
+            interface.add(tool)
+            interface_z.append(z)
+        elif kind == "Support material":
+            body.add(tool)
+        elif tool == interface_tool and kind != "Skirt/Brim":
+            raise ValueError("PETG interface tool extrudes a model feature.")
+    if body != {body_tool} or interface != {interface_tool}:
+        raise ValueError("Support body/interface tools disagree with the requested materials.")
+    if first_layer != {body_tool} or not interface_z or min(interface_z) <= 0.20001:
+        raise ValueError("PETG interface needs a PLA first-layer foundation.")
+    return {"firstPETGInterfaceZ": min(interface_z), "firstLayerTools": sorted(first_layer),
+            "supportBodyTools": sorted(body), "supportInterfaceTools": sorted(interface)}
+
+
+def support_interface(doc, profiles):
+    tool = doc["_indx"].get("supportInterfaceTool")
+    if tool is None:
+        return None
+    entry = next((t for t in doc["_indx"]["tools"] if t["tool"] == tool), None)
+    if type(tool) is not int or not 1 <= tool <= 8 or not entry or entry.get("role") != "support" or entry.get("type") != "PETG":
+        raise ValueError("A support interface needs an explicitly reserved PETG tool.")
+    preset = profiles["materials"].get(entry.get("materialPreset"))
+    if not preset or preset["type"] != "PETG":
+        raise ValueError("Choose an installed INDX PETG preset for the support interface.")
+    return entry
+
+
 def checked_settings(file, document=None):
     doc = read(file) if document is None else document
     s, meta = doc["settings"], doc["_indx"]
@@ -152,6 +200,7 @@ def checked_settings(file, document=None):
     if s["printer"] != PRINTER or float(s["nozzleDiameter"]) != 0.4:
         raise ValueError("Expected the INDX 8T 0.4 HF configuration.")
     profiles = read(ROOT / ".local/indx-profiles.json")
+    support_interface(doc, profiles)
     for t in tools:
         preset = t.get("materialPreset", MATERIAL)
         if preset not in profiles["materials"] or profiles["materials"][preset]["type"] != "PLA":
@@ -283,7 +332,7 @@ def init(args):
     return {"settings": str(settings), "tools": [t["tool"] for t in tools], "calibrated": False, "tdConfigured": td_configured}
 
 
-def patch_native(source, dest, process, bed_model, infill_tool, colormix=False):
+def patch_native(source, dest, process, bed_model, infill_tool, colormix=False, interface_tool=None):
     with zipfile.ZipFile(source) as z:
         p = json.loads(z.read("Metadata/PrusaSlicer3_project.json"))
         g = p["config_containers"][0]
@@ -306,6 +355,23 @@ def patch_native(source, dest, process, bed_model, infill_tool, colormix=False):
             c["print_settings"].update(copy.deepcopy(overrides))
             for key, value in overrides.items():
                 c["toolprint_settings"][key] = [copy.deepcopy(value) for _ in range(8)]
+        if interface_tool is not None:
+            overrides = {"support_material": "everywhere", "support_material_buildplate_only": True,
+                         "support_material_threshold": 55, "support_material_style": "snug",
+                         "support_material_extruder": infill_tool, "support_material_interface_extruder": interface_tool,
+                         "support_material_contact_distance": 0.0, "support_material_bottom_contact_distance": 0.0,
+                         "support_material_interface_layers": 3, "support_material_bottom_interface_layers": 2,
+                         "support_material_interface_spacing": 0.0,
+                         "support_material_interface_speed": {"value": 35.0, "is_percent": False},
+                         "first_layer_support_material_speed": {"value": 20.0, "is_percent": False},
+                         "support_material_xy_spacing": {"value": 0.35, "is_percent": False},
+                         "support_material_synchronize_layers": True, "dont_support_bridges": False,
+                         "brim_width": 3.0, "brim_type": "outer_only",
+                         "raft_layers": 5, "raft_contact_distance": 0.0, "raft_expansion": 3.0}
+            c["print_settings"].update(copy.deepcopy(overrides))
+            for key, value in overrides.items():
+                if key in c["toolprint_settings"]:
+                    c["toolprint_settings"][key] = [copy.deepcopy(value) for _ in range(8)]
         asset = Path(bed_model).resolve()
         if not asset.is_file():
             raise ValueError(f"Missing installed bed display model: {asset}")
@@ -339,6 +405,10 @@ def build(args):
     # The converter's first reopen/slice must use the same geometry schedule
     # and paint penetration as the final project, not the 0.20 mm fallback.
     mapping.update(process=process["print"]["name"], segmentedRegionMaxWidth=1.5, infillTool=mapping["map"]["1"])
+    interface = support_interface(doc, read(ROOT / ".local/indx-profiles.json"))
+    if interface:
+        mapping["materials"][str(interface["tool"])] = interface["materialPreset"]
+        mapping["colors"][str(interface["tool"])] = interface.get("color", "#E5ECEF")
     write(work / "mapping.json", mapping)
     plan = converter(r, "plan", intermediate, "--bed", "1", "--config", work / "mapping.json")
     if plan["target"]["vendorVersion"] != read(ROOT / "chat/processes.json")["vendorVersion"]:
@@ -349,7 +419,7 @@ def build(args):
     converter(r, "convert", intermediate, "--bed", "1", "--config", work / "mapping.json", "--slicer", r["slicer"], "--output", stage, "--accept-settings-changes", log=work / "convert.log")
     native = work / "native.3mf"
     colormix = all("Prusament PLA ColorMix " in t.get("materialPreset", "") for t in tools)
-    patch_native(stage, native, process, r["bedModel"], mapping["map"]["1"], colormix)
+    patch_native(stage, native, process, r["bedModel"], mapping["map"]["1"], colormix, interface["tool"] if interface else None)
     validation = converter(r, "validate", native, "--slicer", r["slicer"], log=work / "validate.log")
     if not validation.get("passed"):
         raise ValueError("Native reopen-and-slice did not pass.")
@@ -361,7 +431,10 @@ def build(args):
     selected, used = gcode_tools(text)
     native_info = converter(r, "inspect", native)
     expected = sorted(native_info["usedColors"])
-    if not set(expected).issubset(used) or not set(selected).issubset({t["tool"] for t in tools}):
+    allowed = {t["tool"] for t in tools} | ({interface["tool"]} if interface else set())
+    if interface and interface["tool"] in expected:
+        raise ValueError("Reserved PETG must not appear in model colour paint.")
+    if not set(expected).issubset(used) or not set(selected).issubset(allowed):
         raise ValueError(f"G-code selections {selected} / filament-use tools {used} disagree with painted tools {expected} / inventory.")
     report = {"passed": True, "physicalPrintTested": False, "printer": "CORE One INDX 8T / 8 x 0.4 HF", "slicer": r["slicerVersion"],
               "layerHeight": process["layerHeight"], "settingsSha256": settings_hash, "sourceSha256": sha(source), "outputSha256": sha(native),
@@ -371,6 +444,8 @@ def build(args):
     report["estimatedPrintTime"] = re.search(r"^; estimated printing time \(normal mode\) = (.+)$", text, re.M).group(1)
     report["filamentGrams"] = float(re.search(r"^; total filament used \[g\] = (.+)$", text, re.M).group(1))
     report["toolChangeCount"] = int(re.search(r"^; total toolchanges = (\d+)$", text, re.M).group(1))
+    support_check = check_support_gcode(text, mapping["map"]["1"], interface["tool"]) if interface else None
+    report["supportInterface"] = {"tool": interface["tool"], "materialPreset": interface["materialPreset"], "used": interface["tool"] in used, "gcodeCheck": support_check} if interface else None
     output.parent.mkdir(parents=True, exist_ok=True)
     if sha(settings) != settings_hash or (sha(output) if output.exists() else None) != previous_hash:
         raise ValueError("Settings or current print changed while slicing. Current output was preserved.")
@@ -395,7 +470,9 @@ def build(args):
     write(project / "Source/Validation.json", report)
     write(interactive / "preview.json", {"settingsSha256": settings_hash, "directory": str(interactive), "input": str(interactive / "input.mesh"), "output": str(interactive / "output.mesh"), "validated": False})
     colour_status = "TD-informed and uncalibrated" if doc["settings"].get("honorTD") else "approximate and uncalibrated; opaque dithering is used"
-    (project / "README.md").write_text(f"# {project.name}\n\n[Current print project](Print%20Files/{output.name.replace(' ', '%20')})\n\nCORE One INDX 8T, eight 0.4 mm HF tools; PrusaSlicer {r['slicerVersion']}, {process['layerHeight']} mm layers. Prusament PLA; colour tools {selected}.\n\nNative reopen and fresh slice passed. **Not physically tested.** Colour swatches are {colour_status}.\n\n[Dither settings](Source/Dither.json) · [Validation and SHA-256](Source/Validation.json) · [Original model](Reference/{source.name.replace(' ', '%20')}) · [Previews](Reference/Previews/)\n\nSlice diagnostics are retained in Validation.json; inspect geometry/colour coverage before printing. This is an experimental dithered surface, not a calibrated optical recipe.\n\nTool 8 is reserved for PETG in the default inventory. This project does not automatically add supports or PETG interfaces. Review model-specific supports before printing.\n")
+    source_link = os.path.relpath(source, project).replace(" ", "%20")
+    support_note = (f"PLA support bodies with PETG interface on tool {interface['tool']}; 55 degree threshold, 0 mm top/bottom contact gap, 3 top and 2 bottom interface layers, five-layer PLA/PETG raft. Confirm the actual PETG spool profile before printing." if interface else "Tool 8 is reserved for PETG in the default inventory. This project does not automatically add supports or PETG interfaces. Review model-specific supports before printing.")
+    (project / "README.md").write_text(f"# {project.name}\n\n[Current print project](Print%20Files/{output.name.replace(' ', '%20')})\n\nCORE One INDX 8T, eight 0.4 mm HF tools; PrusaSlicer {r['slicerVersion']}, {process['layerHeight']} mm layers. Prusament PLA; colour tools {expected}.\n\nNative reopen and fresh slice passed. **Not physically tested.** Colour swatches are {colour_status}.\n\n[Dither settings](Source/Dither.json) · [Validation and SHA-256](Source/Validation.json) · [Input model]({source_link}) · [Previews](Reference/Previews/)\n\nSlice diagnostics are retained in Validation.json; inspect geometry/colour coverage before printing. This is an experimental dithered surface, not a calibrated optical recipe.\n\n{support_note}\n")
     with (project / "README.md").open("a") as f:
         f.write(f"\nNormal-mode estimate: {report['estimatedPrintTime']}, {report['filamentGrams']} g, {report['toolChangeCount']} tool changes.\n")
     return report

@@ -21,7 +21,7 @@ under `.local/`; compiler/tool dependencies use Homebrew's ordinary locations.
 Re-query installed alpha14 presets using `node scripts/refresh-indx.cjs`, then
 rebuild using `scripts/build-indx.sh --test`. The checked-in printer registry
 contains only geometry/process data. Full resolved native configuration stays
-in `.local/indx-profiles.json`. Never reuse alpha14 presets in alpha14's data
+in `.local/indx-profiles.json`. Never reuse alpha14 presets in alpha13's data
 directory. The isolated launcher prevents forced preset downgrades from touching
 the user's current PrusaSlicer installation.
 
@@ -39,8 +39,22 @@ Update this inventory or pass a separate `--inventory FILE` when the user
 confirms new spools. There may be 1–8 colour tools, with non-contiguous tool
 numbers. Only PLA colour entries are currently accepted. Reserve a tool by
 setting `role: "support"`; it will not enter the colour palette. Do not assume
-eight installed tools mean eight loaded colours. The build does not
-automatically configure PETG interfaces or supports.
+eight installed tools mean eight loaded colours. Supports remain off unless
+explicitly requested for the project.
+
+For an approved PLA/PETG support experiment, set `_indx.supportInterfaceTool`
+to the reserved tool number in `Source/Dither.json`, and give that support
+entry an installed INDX PETG `materialPreset`. The build excludes it from model
+paint, retains its native material preset and adds snug build-plate supports:
+55 degree threshold, PLA bodies on the selected infill tool, PETG interfaces,
+zero top/bottom contact gap, dense 3 top and 2 bottom interface layers,
+35 mm/s interfaces, 0.35 mm XY separation and synchronized support layers.
+A five-layer raft with zero contact gap and 3 mm expansion places PLA beneath
+the PETG contact surface on the cooler PLA sheet. Inspect actual first-layer
+toolpaths and material separation; a reserved slot alone does not enable this.
+The build checks actual feature toolpaths, rejects PETG model extrusion and
+requires a PLA-only first layer below the PETG interfaces. Confirm the actual
+PETG spool and profile before printing.
 
 ## A project
 
@@ -128,4 +142,5 @@ retain their own recorded validation version until rebuilt.
 A selected backing/infill tool does not establish a completely white interior:
 painted regions can extend into infill. Inspect actual per-feature G-code before
 claiming an optical backing or calibrated colour. The turtle test exercises all
-seven tools and has no support extrusion; it remains physically untested.
+seven tools. The archived blob revision has no supports; the realistic v2
+adds a reserved PETG interface and PLA raft. Both remain physically untested.
