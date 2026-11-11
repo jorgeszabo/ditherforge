@@ -29,8 +29,9 @@ the user's current PrusaSlicer installation.
 
 `chat/inventory.json` records the prepared Prusament ColorMix loadout in Prusa's
 recommended order: T1 Cyan, T2 Magenta, T3 Yellow, T4 White, T5 Black,
-T6 Gold Glitter, T7 Silver Glitter. T8 is reserved for clear PETG (brand not
-specified), excluded from the colour palette. This is not a live printer query.
+T6 Gold Glitter, T7 Silver Glitter. T8 is reserved for confirmed Prusament PETG
+Clear, using the installed Prusament PETG INDX preset and excluded from the
+colour palette. This is not a live printer query.
 The swatches come from official ColorMix presets, not measured print patches.
 TD remains null, so this workflow uses uncalibrated spatial dithering rather
 than Prusa's calibrated native ColorMix layer recipes.

@@ -1,5 +1,5 @@
 {
-  "description": "Required loadout: official Prusa ColorMix order, confirmed by Jorge for this test. This is not a query of physically loaded spools. Swatches from official material presets; TD unmeasured. Tool 8 reserved and unused.",
+  "description": "Required loadout: official Prusa ColorMix order, confirmed by Jorge for this test. This is not a query of physically loaded spools. Swatches from official material presets; TD unmeasured. Tool 8 reserved for confirmed Prusament PETG Clear support interfaces; never part of model colour mixing.",
   "source": "https://blog.prusa3d.com/prusament-pla-colormix-print-45-color-shades-using-just-five-filament-spools-and-more_137835/",
   "tools": [
     {
@@ -67,10 +67,12 @@
     },
     {
       "tool": 8,
-      "label": "Clear PETG \u2014 reserved, brand not specified",
+      "label": "Prusament PETG Clear",
       "type": "PETG",
       "role": "support",
-      "td": null
+      "td": null,
+      "materialPreset": "Prusament PETG @COREONEINDX HF0.4@COREONEINDX 0.4",
+      "color": "#E5ECEF"
     }
   ]
 }

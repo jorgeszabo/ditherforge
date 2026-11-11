@@ -249,5 +249,49 @@
       "Fragmented painted export has open boundaries; native slice passed with recorded Voronoi recovery errors.",
       "Clear PETG brand not confirmed; Generic PETG is an editable baseline."
     ]
+  },
+  "stylizedTurtleAlpha14": {
+    "date": "2026-11-11",
+    "slicer": "3.0.0-alpha14",
+    "vendorVersion": "1.0.23",
+    "passed": true,
+    "physicalPrintTested": false,
+    "sourceSha256": "c73054ff986b9bc7bb5bfa3f342a53ed994c53547795a12aedeb46bc6e32f9d7",
+    "outputSha256": "d854fbdbb7af567064581020fdd795ea16d3e6b48e614c681a8005b44fcd1621",
+    "settingsSha256": "2670e8ff756d35868936ab22f8c310432a5905e811aca6f679d4d789e43252b1",
+    "estimatedPrintTime": "4h 59m 56s",
+    "filamentGrams": 18.0,
+    "toolChangeCount": 818,
+    "modelTools": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "supportInterface": {
+      "tool": 8,
+      "materialPreset": "Prusament PETG @COREONEINDX HF0.4@COREONEINDX 0.4",
+      "used": true,
+      "gcodeCheck": {
+        "firstPETGInterfaceZ": 0.8,
+        "firstLayerTools": [
+          4
+        ],
+        "supportBodyTools": [
+          4
+        ],
+        "supportInterfaceTools": [
+          8
+        ]
+      }
+    },
+    "firstModelLayerZ": 1.55,
+    "bedGcodeTargets": [
+      50
+    ],
+    "note": "Friendly geometry, seven ColorMix PLA colours, confirmed Prusament PETG Clear on T8; uncalibrated and physically untested. Voronoi diagnostics retained in project validation."
   }
 }
